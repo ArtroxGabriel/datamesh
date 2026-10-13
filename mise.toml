@@ -1,0 +1,6 @@
+[tools]
+go = "latest"
+protoc = "latest"
+protoc-gen-go = "latest"
+task = "latest"
+uv = "latest"

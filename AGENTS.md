@@ -1,0 +1,91 @@
+## Project Overview
+
+- Gestão de Ambiente Inteligente (DataMesh DCIM -- Data Center Infrastructure Management).
+- Sistema distribuído para monitoramento, coleta de telemetria contínua, detecção de eventos e controle de climatização em racks de data center.
+- Trabalho prático 1 da disciplina de Sistemas Distribuídos / Distribuição de Processos e Dados (UFC - Prof. Dr. Paulo A. L. Rego).
+- Estágio: MVP acadêmico modular e desacoplado.
+
+## Tech Stack
+
+- Linguagens: Python 3.12+ (gerenciado via `uv`) e Go 1.22+ (gerenciado via `mise`).
+- Serialização & RPC: Protocol Buffers v3 (`protoc` 36+) e gRPC.
+- Rede e Transporte:
+  - UDP Multicast para descoberta dinâmica de fontes (`239.255.0.1:9999`).
+  - UDP Unicast para streaming contínuo de telemetria e alertas imediatos orientados a eventos.
+  - TCP (com framing length-prefixed: 4 bytes big-endian + payload Protobuf) entre Cliente e Gateway.
+  - gRPC entre Gateway e fontes atuadoras (Ar-Condicionado de Precisão).
+- Persistência: SQLite local no Gateway para armazenamento de séries temporais e suporte a consultas analíticas agregadas.
+- Orquestração & Containers: Docker e Docker Compose (com `network_mode: host` para suporte nativo a UDP Multicast).
+- Automação: `Taskfile.yml` / `mise` / `uv`.
+
+## File Structure
+
+docs/, proto/, gen/, gateway/, sources/, client/, scripts/
+
+- `docs/` — Documentação do projeto, especificação da disciplina e objetivos detalhados.
+- `proto/` — Definições formais de contratos Protocol Buffers (`.proto`) para mensagens e serviços gRPC.
+- `gen/` — Código gerado pelo compilador `protoc` para Python e Go (não editar manualmente).
+- `gateway/` — Processo central: ingestão UDP, discovery multicast, proxy gRPC, servidor TCP e persistência SQLite.
+- `sources/` — Processos independentes das fontes de dados heterogêneas (AC, sensor térmico, PDU).
+- `sources/ac/` — Ar-Condicionado de Precisão (Python): servidor gRPC de atuação e streaming UDP.
+- `sources/temperature/` — Sensor de temperatura de rack (Python): envio UDP contínuo e disparos imediatos por anomalia (> 35°C).
+- `sources/pdu/` — PDU de Rack (Go): telemetria de potência/corrente/tensão via UDP contínuo.
+- `client/` — Interface de usuário (CLI) conectada via TCP ao Gateway.
+
+## Common Commands
+
+- Gerar código Protobuf (Python & Go):
+  `mise exec -- task proto` ou `./scripts/build_protos.sh`
+- Subir ambiente com Docker Compose:
+  `docker compose up --build`
+- Executar Gateway localmente:
+  `uv run python -m gateway.main`
+- Executar Fontes localmente:
+  - AC: `uv run python -m sources.ac.main`
+  - Sensor: `uv run python -m sources.temperature.main`
+  - PDU: `mise exec -- go run ./sources/pdu/cmd/main.go`
+- Executar Cliente CLI:
+  `uv run python -m client.main`
+- Testes:
+  - Python: `uv run pytest`
+  - Go: `mise exec -- go test ./...`
+- Linters, Checagem de Tipos & Formatação:
+  - Python: `uv run ty check` (type checking da Astral: <https://docs.astral.sh/ty/>), `uv run ruff check .` e `uv run ruff format .`
+  - Go: `mise exec -- go vet ./...` e `mise exec -- gofmt -w .`
+
+## Environment / Setup
+
+- Ferramentas locais gerenciadas pelo `mise`: `uv`, `go`, `task`, `protoc`, `protoc-gen-go` (e opcionalmente `ty`).
+- Instalar dependências da toolchain:
+  `mise install`
+- Suporte a Docker & Compose: Docker Engine instalado localmente com suporte a `docker compose` (opcional após validação local do MVP).
+  - Nota de rede: os serviços usam `network_mode: host` para garantir que pacotes de descoberta UDP Multicast transitem sem bloqueios de bridge.
+
+## Code Quality
+
+- Seguir convenções do repositório: funções pequenas (4-20 linhas), SRP, nomes descritivos.
+- Python: tipagem estrita com Type Hints checada via `ty` (Astral) e `ruff`, imutabilidade onde aplicável.
+- Go: padrão idiomático, tratamento explícito de erros, `go vet` e `gofmt`.
+- Protos: estilo oficial Google Protobuf (snake_case para campos, PascalCase para mensagens/serviços).
+
+## Architecture Conventions
+
+- Contrato Protobuf único (`proto/datamesh.proto`): centraliza mensagens UDP, TCP e definições gRPC para evitar complexidade de imports entre Python e Go.
+- Gateway é o intermediário único para clientes: o Cliente nunca conversa diretamente com as Fontes; tudo é mediado via socket TCP.
+- Framing TCP obrigatório: delimitação explícita por tamanho do payload (`uint32` big-endian).
+- Fontes são processos desacoplados com resiliência a falhas e reconexão.
+- Detecção de falha passiva no Gateway: baseada no timestamp `last_seen` dos pacotes UDP de cada fonte (`> 15s` sem telemetria marca a fonte como `OFFLINE`).
+- Simulação de anomalia sob demanda: `sources/temperature` permite gatilho interativo no terminal para disparar leitura `> 35°C` imediatamente via UDP.
+- O banco SQLite reside exclusivamente no Gateway e armazena leituras com timestamp, device_id e valores métricos normalizados.
+
+## Known Gotchas
+
+- UDP Multicast no Docker: pontes padrão (`bridge`) podem descartar pacotes IGMP/multicast sem configuração explícita; `network_mode: host` é a abordagem recomendada no Linux.
+- Diretório `gen/`: nunca editar manualmente os arquivos gerados pelo `protoc`.
+- Sockets TCP: streaming contínuo exige sempre leitura do cabeçalho de 4 bytes de comprimento para ler exatamente o tamanho do frame Protobuf.
+
+## Agent Do's and Don'ts
+
+- Não acoplar o Cliente diretamente a bancos ou fontes; respeitar a topologia distribuída.
+- Manter documentação e comentários focados no "porquê" das decisões técnicas.
+- Não remover anotações arquiteturais ou decisões registradas neste documento.
