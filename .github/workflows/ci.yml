@@ -1,0 +1,52 @@
+name: CI Validation Pipeline
+
+on:
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  verify:
+    name: Proto, Lint, Typecheck & Tests (Python + Go)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+
+      - name: Install protoc-gen-go
+        run: go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Sync Python dependencies
+        run: uv sync --dev
+
+      - name: Generate Protobuf definitions (Python & Go)
+        run: bash scripts/build_protos.sh
+
+      - name: Lint and Format Check (Python - Ruff)
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Type Check (Python - Astral ty)
+        run: uv run ty check
+
+      - name: Static Analysis (Go - go vet)
+        working-directory: sources/pdu
+        run: go vet ./...
+
+      - name: Run Python Tests with Coverage (>=80%)
+        run: uv run pytest --cov=common --cov-report=term-missing --cov-fail-under=80
+
+      - name: Run Go Tests
+        working-directory: sources/pdu
+        run: go test -v ./...
