@@ -12,7 +12,7 @@ O objetivo principal é construir um **sistema distribuído de monitoramento e c
 
 1. **Fontes de Dados Distribuídas (Processos Independentes):** Dispositivos e sensores heterogêneos simulados (sensores contínuos, sensores orientados a eventos e atuadores controláveis).
 2. **Gateway Central:** Concentrador que orquestra a descoberta dinâmica, ingere fluxos de telemetria, persiste leituras e atua como intermediário para comandos e análises.
-3. **Cliente (Painel/CLI):** Interface que conecta ao Gateway para inspecionar topologia, enviar atuações e disparar consultas analíticas agregadas.
+3. **Cliente (Dashboard Web):** Processo independente em Python que conecta ao Gateway via socket TCP (Protobuf) e expõe uma interface gráfica Web para inspecionar topologia, visualizar séries temporais em tempo real, enviar atuações e disparar consultas analíticas agregadas.
 
 ### Conceitos de Sistemas Distribuídos Consolidados no Projeto
 
@@ -61,11 +61,13 @@ O sistema foi instanciado no domínio de **Data Center Infrastructure Management
                                          │ TCP (Length-Prefixed Protobuf)
                                          ▼
 +-----------------------------------------------------------------------------------+
-|                                 CLIENTE (CLI)                                     |
+|                         CLIENTE WEB (Python / FastAPI)                            |
 |                                                                                   |
-|  • Listagem de fontes ativas e respectivos estados                                |
+|  • Comunica-se com o Gateway exclusivamente via Socket TCP + Protobuf             |
+|  • Dashboard Web (HTML + Chart.js) com gráficos de séries temporais               |
+|  • Listagem de fontes ativas e respectivos estados (ONLINE / OFFLINE)             |
 |  • Envio de parâmetros de operação (ligar/desligar AC, setpoint, rotação)         |
-|  • Execução de consultas analíticas sobre o histórico                             |
+|  • Execução de consultas analíticas agregadas sobre o histórico                   |
 +-----------------------------------------------------------------------------------+
 ```
 
@@ -98,9 +100,10 @@ O sistema foi instanciado no domínio de **Data Center Infrastructure Management
   * Listagem de estados e envio de comandos de atuação via gRPC a partir do Cliente.
   * Execução das 3 consultas analíticas agregadas sobre o histórico no Gateway.
   * Demonstração de falha/desligamento de uma fonte de dados e tratamento pelo Gateway.
-* **Bônus Atendidos:**
+* **Bônus Atendidos (100% da pontuação extra):**
   * Uso de mais de uma linguagem de programação (Python 3 e Go).
   * Persistência de dados em banco de dados (SQLite) no Gateway com suporte a consultas sobre o histórico de leituras.
+  * Cliente com interface gráfica Web e visualização de séries temporais dos dados coletados.
 
 ---
 
@@ -109,10 +112,11 @@ O sistema foi instanciado no domínio de **Data Center Infrastructure Management
 Para manter o projeto enxuto, evolutivo e fácil de demonstrar no vídeo de 7 minutos:
 
 ### Decisões de Simplificação
-1. **Contrato Protobuf Único (`proto/datamesh.proto`):** Todas as mensagens (Discovery, Telemetria UDP, Requisições/Respostas TCP do Cliente) e o serviço gRPC do Ar-Condicionado ficam em um único arquivo `.proto`, evitando problemas de import relativo entre Python e Go.
-2. **Simulação de Anomalia sob Demanda (> 35°C):** O sensor de temperatura envia leituras periódicas normais, mas aceita um comando interativo no próprio terminal (ex: pressionar `Enter`) para disparar imediatamente um pico térmico `> 35°C` durante a gravação da demonstração.
-3. **Detecção Passiva de Falha/Desligamento (`last_seen`):** O Gateway registra o timestamp do último pacote UDP recebido de cada fonte. Se `agora - last_seen > 15s`, a fonte é exibida como `OFFLINE` na listagem do Cliente (atendendo ao requisito de demonstrar falha/desligamento sem precisar de healthchecks ativos).
-4. **Execução Local Primeiro (`Taskfile.yml` + `uv` + `go run`):** Todo o desenvolvimento e validação serão feitos com processos locais primeiro; Docker Compose fica como etapa opcional caso sobre tempo após o MVP estar 100% funcional.
+1. **Contrato Protobuf Único (`proto/datamesh.proto`):** Todas as mensagens (Discovery, Telemetria UDP, Requisições/Respostas TCP do Cliente, incluindo histórico para séries temporais) e o serviço gRPC do Ar-Condicionado ficam em um único arquivo `.proto`, evitando problemas de import relativo entre Python e Go.
+2. **Cliente Web desacoplado via TCP (`FastAPI` + `Chart.js`):** O processo `client/` atua como um servidor Web em Python (`FastAPI` + `uvicorn`) que entrega uma página única com gráficos (`Chart.js`), mas **toda comunicação entre Cliente e Gateway ocorre estritamente via Socket TCP puro com framing Protobuf** (sem acesso direto ao SQLite e sem HTTP no Gateway).
+3. **Simulação de Anomalia sob Demanda (> 35°C):** O sensor de temperatura envia leituras periódicas normais, mas aceita um comando interativo no próprio terminal (ex: pressionar `Enter`) para disparar imediatamente um pico térmico `> 35°C` durante a gravação da demonstração.
+4. **Detecção Passiva de Falha/Desligamento (`last_seen`):** O Gateway registra o timestamp do último pacote UDP recebido de cada fonte. Se `agora - last_seen > 15s`, a fonte é exibida como `OFFLINE` na listagem do Cliente (atendendo ao requisito de demonstrar falha/desligamento sem precisar de healthchecks ativos).
+5. **Execução Local Primeiro (`Taskfile.yml` + `uv` + `go run`):** Todo o desenvolvimento e validação serão feitos com processos locais primeiro; Docker Compose fica como etapa opcional caso sobre tempo após o MVP estar 100% funcional.
 
 ### Ordem de Implementação
 1. **Etapa 1 — Contrato e Base:** Criar `proto/datamesh.proto`, configurar `pyproject.toml`, `go.mod` e `Taskfile.yml`, e gerar código em `gen/python` e `gen/go`.
@@ -121,4 +125,4 @@ Para manter o projeto enxuto, evolutivo e fácil de demonstrar no vídeo de 7 mi
    * `sources/temperature` (Python): responde ao multicast, envia temperatura periódica via UDP e dispara alerta imediato `> 35°C` sob demanda.
    * `sources/ac` (Python): responde ao multicast, expõe servidor gRPC de atuação e envia telemetria via UDP.
    * `sources/pdu` (Go): responde ao multicast e envia telemetria de potência/corrente via UDP.
-4. **Etapa 4 — Cliente CLI (`client/`):** Menu interativo via TCP para listar fontes (`ONLINE`/`OFFLINE`), enviar comandos gRPC ao AC via Gateway e executar as 3 consultas analíticas agregadas.
+4. **Etapa 4 — Cliente Web (`client/`):** Servidor Web em Python (`FastAPI`) conectado via socket TCP (framing Protobuf) ao Gateway + Dashboard single-page (`HTML` + `Chart.js`) para listar fontes (`ONLINE`/`OFFLINE`), visualizar gráficos de séries temporais, enviar comandos gRPC ao AC via Gateway e executar as 3 consultas analíticas agregadas.

@@ -8,6 +8,7 @@
 ## Tech Stack
 
 - Linguagens: Python 3.12+ (gerenciado via `uv`) e Go 1.22+ (gerenciado via `mise`).
+- Interface Web (Cliente): `FastAPI` + `uvicorn` no backend do Cliente e página single-page com `Chart.js` para visualização de séries temporais.
 - Serialização & RPC: Protocol Buffers v3 (`protoc` 36+) e gRPC.
 - Rede e Transporte:
   - UDP Multicast para descoberta dinâmica de fontes (`239.255.0.1:9999`).
@@ -30,7 +31,7 @@ docs/, proto/, gen/, gateway/, sources/, client/, scripts/
 - `sources/ac/` — Ar-Condicionado de Precisão (Python): servidor gRPC de atuação e streaming UDP.
 - `sources/temperature/` — Sensor de temperatura de rack (Python): envio UDP contínuo e disparos imediatos por anomalia (> 35°C).
 - `sources/pdu/` — PDU de Rack (Go): telemetria de potência/corrente/tensão via UDP contínuo.
-- `client/` — Interface de usuário (CLI) conectada via TCP ao Gateway.
+- `client/` — Processo do Cliente Web (Python/`FastAPI`) que serve o Dashboard de séries temporais via HTTP ao navegador e se comunica exclusivamente via socket TCP (framing Protobuf) com o Gateway.
 
 ## Common Commands
 
@@ -44,8 +45,8 @@ docs/, proto/, gen/, gateway/, sources/, client/, scripts/
   - AC: `uv run python -m sources.ac.main`
   - Sensor: `uv run python -m sources.temperature.main`
   - PDU: `mise exec -- go run ./sources/pdu/cmd/main.go`
-- Executar Cliente CLI:
-  `uv run python -m client.main`
+- Executar Cliente Web (Dashboard):
+  `uv run python -m client.main` (acessível em `http://localhost:8080`)
 - Testes:
   - Python: `uv run pytest`
   - Go: `mise exec -- go test ./...`
@@ -71,7 +72,7 @@ docs/, proto/, gen/, gateway/, sources/, client/, scripts/
 ## Architecture Conventions
 
 - Contrato Protobuf único (`proto/datamesh.proto`): centraliza mensagens UDP, TCP e definições gRPC para evitar complexidade de imports entre Python e Go.
-- Gateway é o intermediário único para clientes: o Cliente nunca conversa diretamente com as Fontes; tudo é mediado via socket TCP.
+- Gateway é o intermediário único para clientes: o Cliente Web nunca conversa diretamente com as Fontes nem acessa o SQLite; o navegador fala HTTP com o processo `client/`, e o `client/` fala exclusivamente via socket TCP (framing Protobuf) com o Gateway.
 - Framing TCP obrigatório: delimitação explícita por tamanho do payload (`uint32` big-endian).
 - Fontes são processos desacoplados com resiliência a falhas e reconexão.
 - Detecção de falha passiva no Gateway: baseada no timestamp `last_seen` dos pacotes UDP de cada fonte (`> 15s` sem telemetria marca a fonte como `OFFLINE`).
