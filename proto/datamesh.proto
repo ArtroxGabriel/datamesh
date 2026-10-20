@@ -1,0 +1,105 @@
+syntax = "proto3";
+
+package datamesh;
+
+option go_package = "datamesh/gen/go;datameshpb";
+
+enum DeviceType {
+  DEVICE_TYPE_UNKNOWN = 0;
+  AIR_CONDITIONER = 1;
+  TEMPERATURE_SENSOR = 2;
+  RACK_PDU = 3;
+}
+
+enum ClientAction {
+  CLIENT_ACTION_UNKNOWN = 0;
+  LIST_DEVICES = 1;
+  CONTROL_AC = 2;
+  QUERY_ANALYTICS = 3;
+  GET_HISTORY = 4;
+}
+
+enum AnalyticsQueryType {
+  ANALYTICS_QUERY_UNKNOWN = 0;
+  HOTTEST_RACK = 1;
+  AVG_PDU_POWER = 2;
+  THERMAL_STABILITY = 3;
+}
+
+// Sent by Gateway over UDP Multicast (239.255.0.1:9999)
+message DiscoveryRequest {
+  string gateway_ip = 1;
+  int32 telemetry_udp_port = 2;
+}
+
+// Sent by Data Sources in response to DiscoveryRequest or listed by Gateway
+message DeviceInfo {
+  string device_id = 1;
+  DeviceType device_type = 2;
+  string ip = 3;
+  int32 grpc_port = 4;
+  bool is_online = 5;
+  string state_summary = 6;
+  int64 last_seen_ms = 7;
+}
+
+// Continuous telemetry and immediate threshold alerts sent over UDP to Gateway
+message TelemetryPacket {
+  string device_id = 1;
+  DeviceType device_type = 2;
+  int64 timestamp_ms = 3;
+  bool is_alert = 4;
+  double temperature_c = 5;
+  double target_temp_c = 6;
+  int32 fan_speed_pct = 7;
+  double power_watts = 8;
+  double current_amps = 9;
+  double voltage_volts = 10;
+  bool ac_power_on = 11;
+}
+
+// gRPC control payload for Precision Air Conditioner
+message ACControlRequest {
+  string device_id = 1;
+  bool power_on = 2;
+  double target_temp_c = 3;
+  int32 fan_speed_pct = 4;
+}
+
+message ACControlResponse {
+  bool success = 1;
+  string message = 2;
+  DeviceInfo updated_device = 3;
+}
+
+service AirConditionerService {
+  rpc SetControl(ACControlRequest) returns (ACControlResponse);
+}
+
+message AnalyticsResult {
+  AnalyticsQueryType query_type = 1;
+  string target_device_id = 2;
+  double primary_value = 3;
+  double secondary_value = 4;
+  string unit = 5;
+  string summary = 6;
+  int32 sample_count = 7;
+}
+
+// TCP length-prefixed request from Client to Gateway
+message ClientRequest {
+  ClientAction action = 1;
+  ACControlRequest ac_control = 2;
+  AnalyticsQueryType query_type = 3;
+  int32 window_seconds = 4;
+  int32 history_limit = 5;
+}
+
+// TCP length-prefixed response from Gateway to Client
+message ClientResponse {
+  bool success = 1;
+  string message = 2;
+  repeated DeviceInfo devices = 3;
+  AnalyticsResult analytics = 4;
+  repeated TelemetryPacket history = 5;
+}
