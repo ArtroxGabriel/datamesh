@@ -1,0 +1,33 @@
+version: '3'
+
+tasks:
+  default:
+    desc: Run full verification pipeline (proto + lint + test)
+    cmds:
+      - task: check
+
+  proto:
+    desc: Generate Python and Go code from proto/datamesh.proto
+    cmds:
+      - bash scripts/build_protos.sh
+
+  lint:
+    desc: Run linters, format checks, and type checks (Python & Go)
+    cmds:
+      - uv run ruff check .
+      - uv run ruff format --check .
+      - uv run ty check
+      - cd sources/pdu && go vet ./...
+
+  test:
+    desc: Run Python and Go test suites with coverage check (>=80%)
+    cmds:
+      - uv run pytest --cov=common --cov-report=term-missing --cov-fail-under=80
+      - cd sources/pdu && go test -v ./...
+
+  check:
+    desc: Execute complete validation pipeline (proto -> lint -> test)
+    cmds:
+      - task: proto
+      - task: lint
+      - task: test

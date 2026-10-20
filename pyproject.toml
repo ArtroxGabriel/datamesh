@@ -1,0 +1,41 @@
+[project]
+name = "datamesh-dcim"
+version = "0.1.0"
+description = "DataMesh DCIM - Distributed Data Center Infrastructure Management"
+readme = "docs/GOAL.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "grpcio>=1.68.0",
+    "grpcio-tools>=1.68.0",
+    "protobuf>=5.29.0",
+    "uvicorn>=0.32.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.0",
+    "pytest>=8.3.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.9.0",
+    "ty>=0.0.1a0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = [".", "gen/python"]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["gen"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ty.environment]
+extra-paths = ["gen/python"]
+
+[tool.ty.src]
+exclude = ["gen/**"]
