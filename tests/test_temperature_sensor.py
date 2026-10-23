@@ -212,6 +212,7 @@ def test_temperature_main_load_config_and_signals(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setenv("SEND_INTERVAL_SEC", "1.5")
     monkeypatch.setenv("MULTICAST_GROUP", "239.255.0.3")
     monkeypatch.setenv("MULTICAST_PORT", "9991")
+    monkeypatch.setenv("BASE_TEMP_C", "27.5")
 
     # Act
     cfg = _load_config()
@@ -223,7 +224,39 @@ def test_temperature_main_load_config_and_signals(monkeypatch: pytest.MonkeyPatc
     assert abs(cfg[3] - 1.5) < 1e-4
     assert cfg[4] == "239.255.0.3"
     assert cfg[5] == 9991
+    assert abs(cfg[6] - 27.5) < 1e-4
 
     sensor = TemperatureSensor(device_id="temp-rack-99")
     stop_event = threading.Event()
     _setup_signals(sensor, stop_event, "temp-rack-99")
+
+
+def test_custom_base_temp_and_sigusr1_anomaly_trigger(fake_socket: FakeUDPSocket) -> None:
+    import signal
+    import threading
+
+    from sources.temperature.main import _setup_signals
+
+    sensor = TemperatureSensor(
+        device_id="temp-rack-02",
+        gateway_host="127.0.0.1",
+        gateway_port=9998,
+        base_temp_c=28.0,
+        socket_factory=lambda: fake_socket,
+    )
+    reading = sensor.create_reading()
+    assert 26.5 <= reading.temperature_c <= 30.5
+
+    stop_event = threading.Event()
+    _setup_signals(sensor, stop_event, "temp-rack-02")
+
+    # Act: send SIGUSR1 to trigger anomaly
+    signal.raise_signal(signal.SIGUSR1)
+
+    # Assert: immediate anomaly packet (> 35 C) was sent to Gateway
+    assert len(fake_socket.sent_packets) == 1
+    dispatched = datamesh_pb2.TelemetryPacket()
+    dispatched.ParseFromString(fake_socket.sent_packets[0][0])
+    assert dispatched.device_id == "temp-rack-02"
+    assert dispatched.is_alert is True
+    assert dispatched.temperature_c >= ALERT_THRESHOLD_TEMP_C

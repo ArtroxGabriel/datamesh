@@ -45,6 +45,7 @@ class TemperatureSensor:
         send_interval_sec: float = DEFAULT_INTERVAL_SECONDS,
         multicast_group: str = DEFAULT_MULTICAST_GROUP,
         multicast_port: int = DEFAULT_MULTICAST_PORT,
+        base_temp_c: float = DEFAULT_BASE_TEMP_C,
         socket_factory: Callable[[], UDPSocketProtocol] | None = None,
     ) -> None:
         self.device_id = device_id
@@ -53,6 +54,7 @@ class TemperatureSensor:
         self.send_interval_sec = send_interval_sec
         self.multicast_group = multicast_group
         self.multicast_port = multicast_port
+        self.base_temp_c = base_temp_c
 
         self._socket_factory: Callable[[], UDPSocketProtocol] = socket_factory or (
             lambda: socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -74,9 +76,7 @@ class TemperatureSensor:
             packet = sensor.create_reading(temp_c=24.0)
         """
         temperature = (
-            temp_c
-            if temp_c is not None
-            else round(DEFAULT_BASE_TEMP_C + random.uniform(-1.5, 2.5), 2)
+            temp_c if temp_c is not None else round(self.base_temp_c + random.uniform(-1.5, 2.5), 2)
         )
         alert_flag = is_alert or (temperature >= ALERT_THRESHOLD_TEMP_C)
         return datamesh_pb2.TelemetryPacket(
@@ -141,7 +141,7 @@ class TemperatureSensor:
                 device_type=datamesh_pb2.TEMPERATURE_SENSOR,
                 is_online=True,
                 last_seen_ms=_now_ms(),
-                state_summary=f"Online | Base temp ~{DEFAULT_BASE_TEMP_C:.1f} °C",
+                state_summary=f"Online | Base temp ~{self.base_temp_c:.1f} °C",
             )
             self._sock.sendto(
                 announcement.SerializeToString(),

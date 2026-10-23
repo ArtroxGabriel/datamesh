@@ -32,14 +32,17 @@ def _interactive_anomaly_trigger(sensor: TemperatureSensor, stop_event: threadin
             break
 
 
-def _load_config() -> tuple[str, str, int, float, str, int]:
+def _load_config() -> tuple[str, str | None, int | None, float, str, int, float]:
     sensor_id = os.getenv("SENSOR_ID", "temp-rack-01")
-    gateway_host = os.getenv("GATEWAY_HOST", "127.0.0.1")
-    gateway_port = int(os.getenv("GATEWAY_PORT", "9998"))
+    raw_host = os.getenv("GATEWAY_HOST", "127.0.0.1")
+    gateway_host = raw_host if raw_host else None
+    raw_port = int(os.getenv("GATEWAY_PORT", "9998"))
+    gateway_port = raw_port if raw_port > 0 else None
     interval_sec = float(os.getenv("SEND_INTERVAL_SEC", "3.0"))
     mcast_group = os.getenv("MULTICAST_GROUP", "239.255.0.1")
     mcast_port = int(os.getenv("MULTICAST_PORT", "9999"))
-    return sensor_id, gateway_host, gateway_port, interval_sec, mcast_group, mcast_port
+    base_temp_c = float(os.getenv("BASE_TEMP_C", "23.5"))
+    return sensor_id, gateway_host, gateway_port, interval_sec, mcast_group, mcast_port, base_temp_c
 
 
 def _setup_signals(sensor: TemperatureSensor, stop_event: threading.Event, sensor_id: str) -> None:
@@ -49,12 +52,17 @@ def _setup_signals(sensor: TemperatureSensor, stop_event: threading.Event, senso
         sensor.stop()
         sys.exit(0)
 
+    def _on_usr1(_sig: int, _frame: object) -> None:
+        sensor.trigger_anomaly(temp_c=38.8)
+
     signal.signal(signal.SIGINT, _shutdown)
     signal.signal(signal.SIGTERM, _shutdown)
+    if hasattr(signal, "SIGUSR1"):
+        signal.signal(signal.SIGUSR1, _on_usr1)
 
 
 def main() -> None:
-    s_id, gw_host, gw_port, interval, mc_grp, mc_port = _load_config()
+    s_id, gw_host, gw_port, interval, mc_grp, mc_port, base_temp = _load_config()
     sensor = TemperatureSensor(
         device_id=s_id,
         gateway_host=gw_host,
@@ -62,13 +70,15 @@ def main() -> None:
         send_interval_sec=interval,
         multicast_group=mc_grp,
         multicast_port=mc_port,
+        base_temp_c=base_temp,
     )
     stop_event = threading.Event()
     _setup_signals(sensor, stop_event, s_id)
 
     sensor.start_multicast_listener()
     sensor.start()
-    logger.info("Sensor %s started. Streaming to %s:%d (%.1fs)", s_id, gw_host, gw_port, interval)
+    target_desc = f"{gw_host}:{gw_port}" if gw_host and gw_port else "awaiting multicast beacon"
+    logger.info("Sensor %s started. Target: %s (%.1fs)", s_id, target_desc, interval)
 
     trigger_thread = threading.Thread(
         target=_interactive_anomaly_trigger,
