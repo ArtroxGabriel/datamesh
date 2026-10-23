@@ -3,89 +3,137 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DataMesh DCIM — Painel de Controle</title>
+  <title>DataMesh Monitor</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
-      --bg: #f8fafc;
-      --panel: #ffffff;
-      --border: #cbd5e1;
-      --border-dark: #94a3b8;
+      --bg: #edf2f7;
+      --card-bg: #ffffff;
+      --border: #d1d9e6;
+      --border-input: #cbd5e1;
       --text-main: #0f172a;
       --text-muted: #64748b;
-      --primary: #0284c7;
-      --primary-hover: #0369a1;
-      --success: #16a34a;
-      --danger: #dc2626;
-      --warning: #d97706;
+      --primary: #0066cc;
+      --primary-hover: #0052a3;
+      --green: #0a8754;
+      --red: #dc2626;
+      --amber: #f59e0b;
+      --result-bg: #cbd5e1;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       background-color: var(--bg);
       color: var(--text-main);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      padding: 1.25rem;
+      padding: 1.25rem 2rem;
       line-height: 1.4;
     }
+
+    /* Header */
     header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding-bottom: 1rem;
-      border-bottom: 2px solid var(--border);
       margin-bottom: 1.25rem;
     }
-    .header-title h1 {
-      font-size: 1.35rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-    }
-    .header-title p {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-    }
-    .header-status {
+    .brand {
       display: flex;
       align-items: center;
       gap: 0.75rem;
-      font-family: monospace;
-      font-size: 0.85rem;
     }
-    .badge-status {
+    .badge-dcim {
+      background-color: #0b2545;
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 0.95rem;
+      padding: 0.35rem 0.65rem;
+      border-radius: 6px;
+      letter-spacing: 0.05em;
+    }
+    .brand-text h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .brand-text p {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .status-badge-gateway {
+      background-color: var(--green);
+      color: #ffffff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.35rem 0.85rem;
+      border-radius: 20px;
+      letter-spacing: 0.04em;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .status-badge-gateway::before {
+      content: "";
       display: inline-block;
-      padding: 0.2rem 0.5rem;
-      font-weight: 600;
-      border: 1px solid var(--border);
-      background: var(--panel);
-      border-radius: 2px;
+      width: 6px;
+      height: 6px;
+      background-color: #ffffff;
+      border-radius: 50%;
     }
-    .badge-online {
-      background: #dcfce7;
-      color: var(--success);
-      border-color: #86efac;
-    }
-    .badge-offline {
-      background: #fee2e2;
-      color: var(--danger);
-      border-color: #fca5a5;
+    .clock-display {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-weight: 500;
     }
 
-    /* Grids e Painéis Diretos */
-    .section-title {
-      font-size: 0.9rem;
+    /* Cards e Containers */
+    .section-header {
+      font-size: 0.82rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      color: var(--text-muted);
-      margin-bottom: 0.5rem;
+      color: var(--text-main);
+      margin-bottom: 0.6rem;
     }
-    .panel {
-      background: var(--panel);
+    .card {
+      background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 3px;
-      padding: 1rem;
+      border-radius: 10px;
+      padding: 1.25rem;
       margin-bottom: 1.25rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
     }
+    .card-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .card-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-main);
+    }
+    .tag-alert {
+      color: var(--red);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+    .tag-continuous {
+      color: var(--green);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+
+    /* Grids */
     .grid-two {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -96,60 +144,91 @@
       .grid-two { grid-template-columns: 1fr; }
     }
 
-    /* Tabela de Dispositivos */
-    table.data-table {
+    /* Chart Containers */
+    .chart-container {
+      position: relative;
+      height: 220px;
       width: 100%;
-      border-collapse: collapse;
-      font-size: 0.88rem;
     }
-    table.data-table th, table.data-table td {
+
+    /* Dispositivos */
+    .device-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1rem;
+    }
+    .device-box {
       border: 1px solid var(--border);
-      padding: 0.5rem 0.75rem;
-      text-align: left;
-    }
-    table.data-table th {
-      background: #f1f5f9;
-      font-weight: 600;
-      color: var(--text-muted);
-      font-size: 0.8rem;
-    }
-    table.data-table tr:hover {
+      border-radius: 6px;
+      padding: 0.85rem;
       background: #f8fafc;
     }
-    .mono {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    .device-box-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.4rem;
+    }
+    .device-id {
+      font-weight: 700;
+      font-size: 0.95rem;
+      font-family: ui-monospace, monospace;
+    }
+    .badge-dev {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+    }
+    .badge-dev-online {
+      background: #dcfce7;
+      color: var(--green);
+      border: 1px solid #86efac;
+    }
+    .badge-dev-offline {
+      background: #fee2e2;
+      color: var(--red);
+      border: 1px solid #fca5a5;
+    }
+    .device-details {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      line-height: 1.4;
     }
 
-    /* Gráficos */
-    .chart-box {
-      position: relative;
-      height: 240px;
-      width: 100%;
+    /* Formulários e Inputs */
+    .form-group {
+      margin-bottom: 1rem;
     }
-
-    /* Formulários e Ações */
-    .form-row {
-      margin-bottom: 0.75rem;
-    }
-    .form-row label {
+    .form-label {
       display: block;
       font-size: 0.8rem;
       font-weight: 600;
-      margin-bottom: 0.25rem;
-      color: var(--text-muted);
-    }
-    .input-control {
-      width: 100%;
-      padding: 0.45rem 0.6rem;
-      border: 1px solid var(--border-dark);
-      background: #fff;
       color: var(--text-main);
-      font-size: 0.88rem;
-      border-radius: 2px;
-      outline: none;
+      margin-bottom: 0.35rem;
     }
-    .input-control:focus {
-      border-color: var(--primary);
+    .toggle-container {
+      display: flex;
+      border: 1px solid var(--border-input);
+      border-radius: 8px;
+      padding: 2px;
+      background: #ffffff;
+    }
+    .toggle-btn {
+      flex: 1;
+      padding: 0.45rem;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-weight: 700;
+      font-size: 0.82rem;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: background 0.15s, color 0.15s;
+    }
+    .toggle-btn.active {
+      background: var(--primary);
+      color: #ffffff;
     }
     .slider-row {
       display: flex;
@@ -158,187 +237,207 @@
     }
     .slider-row input[type="range"] {
       flex: 1;
+      height: 6px;
+      background: var(--primary);
+      border-radius: 3px;
+      outline: none;
+      appearance: none;
+      -webkit-appearance: none;
     }
-    .btn {
-      display: inline-block;
-      width: 100%;
-      padding: 0.55rem 1rem;
+    .slider-row input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 14px;
+      height: 18px;
+      background: #ffffff;
+      border: 2px solid var(--primary);
+      border-radius: 3px;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    .slider-value {
+      min-width: 50px;
+      text-align: right;
+      font-family: ui-monospace, monospace;
       font-weight: 600;
       font-size: 0.88rem;
-      text-align: center;
-      border: 1px solid var(--primary);
-      background: var(--primary);
-      color: #fff;
-      cursor: pointer;
-      border-radius: 2px;
+      color: var(--text-main);
     }
-    .btn:hover {
-      background: var(--primary-hover);
+    select.select-control {
+      width: 100%;
+      padding: 0.55rem 0.75rem;
+      border: 1px solid var(--border-input);
+      border-radius: 6px;
+      background: #ffffff;
+      color: var(--text-main);
+      font-size: 0.88rem;
+      outline: none;
     }
-    .btn-group {
-      display: flex;
-      gap: 0.5rem;
-    }
-    .btn-group button {
-      flex: 1;
-      padding: 0.4rem;
-      border: 1px solid var(--border-dark);
-      background: #f1f5f9;
-      color: var(--text-muted);
-      font-weight: 600;
-      cursor: pointer;
-      border-radius: 2px;
-    }
-    .btn-group button.active {
-      background: var(--primary);
-      color: #fff;
+    select.select-control:focus {
       border-color: var(--primary);
     }
+    .btn-action {
+      display: block;
+      width: 100%;
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      padding: 0.65rem;
+      font-weight: 600;
+      font-size: 0.88rem;
+      cursor: pointer;
+      text-align: center;
+      transition: background 0.2s;
+    }
+    .btn-action:hover {
+      background: var(--primary-hover);
+    }
 
-    /* Bloco de Resultado Analítico */
-    .analytics-output {
-      margin-top: 0.75rem;
-      padding: 0.75rem;
-      background: #f1f5f9;
-      border: 1px solid var(--border);
-      border-radius: 2px;
+    /* Caixa de Resultados Analíticos */
+    .analytics-result-box {
+      margin-top: 1rem;
+      background: #dbe2ea;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 1rem;
     }
     .analytics-val {
-      font-size: 1.4rem;
+      font-size: 1.5rem;
       font-weight: 700;
-      color: var(--primary);
+      color: var(--text-main);
       font-family: ui-monospace, monospace;
     }
     .analytics-desc {
-      font-size: 0.85rem;
-      margin-top: 0.25rem;
+      font-size: 0.82rem;
       color: var(--text-main);
+      margin-top: 0.35rem;
     }
 
-    /* Mensagem / Alerta */
-    #notificationBar {
+    /* Notificações */
+    #toastBar {
       display: none;
-      padding: 0.6rem 0.8rem;
-      margin-bottom: 1rem;
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: #ffffff;
       border: 1px solid var(--border);
+      padding: 0.65rem 1.25rem;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
       font-size: 0.85rem;
-      border-radius: 2px;
+      z-index: 1000;
     }
   </style>
 </head>
 <body>
 
+  <!-- Top Header -->
   <header>
-    <div class="header-title">
-      <h1>DataMesh DCIM — Console de Operação</h1>
-      <p>Cliente Web via TCP Protobuf / Gateway Central</p>
+    <div class="brand">
+      <div class="badge-dcim">DCIM</div>
+      <div class="brand-text">
+        <h1>DataMesh Monitor</h1>
+        <p>Gestão Térmica e Elétrica Distribuída em Tempo Real</p>
+      </div>
     </div>
-    <div class="header-status">
-      <span class="badge-status badge-online" id="netStatus">TCP CONECTADO</span>
-      <span id="timeClock">--:--:--</span>
+    <div class="header-right">
+      <div class="status-badge-gateway" id="gatewayStatus">GATEWAY TCP ONLINE</div>
+      <div class="clock-display" id="timeClock">--:--:--</div>
     </div>
   </header>
 
-  <div id="notificationBar"></div>
-
   <!-- Topologia de Fontes -->
-  <div class="section-title">Fontes de Dados Conectadas (Discovery & Telemetria)</div>
-  <div class="panel">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Dispositivo</th>
-          <th>Tipo</th>
-          <th>Endereço IP</th>
-          <th>Porta gRPC</th>
-          <th>Estado</th>
-          <th>Última Telemetria</th>
-        </tr>
-      </thead>
-      <tbody id="deviceTableBody">
-        <tr>
-          <td colspan="6" style="text-align:center; color: var(--text-muted);">Consultando Gateway via TCP...</td>
-        </tr>
-      </tbody>
-    </table>
+  <div class="section-header">Topologia e Fontes de Dados Conectadas</div>
+  <div class="card" id="topologyCard">
+    <div id="deviceContainer">Carregando dispositivos do Gateway...</div>
   </div>
 
   <!-- Gráficos de Séries Temporais -->
   <div class="grid-two">
-    <div class="panel">
-      <div class="section-title" style="display:flex; justify-content:space-between;">
-        <span>Monitoramento Térmico (°C)</span>
-        <span style="color: var(--danger); font-size: 0.75rem;">Limiar Alerta: 35.0 °C</span>
+    <div class="card">
+      <div class="card-title-row">
+        <span class="card-title">Séries Temporais Térmicas (°C)</span>
+        <span class="tag-alert">LIMIAR ALERTA: 35.0°C</span>
       </div>
-      <div class="chart-box">
+      <div class="chart-container">
         <canvas id="thermalChart"></canvas>
       </div>
     </div>
-    <div class="panel">
-      <div class="section-title">Telemetria Elétrica — PDU (Watts)</div>
-      <div class="chart-box">
+    <div class="card">
+      <div class="card-title-row">
+        <span class="card-title">Telemetria Elétrica da PDU (Potência & Tensão)</span>
+        <span class="tag-continuous">CONTINUOUS UDP</span>
+      </div>
+      <div class="chart-container">
         <canvas id="powerChart"></canvas>
       </div>
     </div>
   </div>
 
-  <!-- Controles e Consultas -->
+  <!-- Controles Inferiores -->
   <div class="grid-two">
-    <!-- Atuação AC -->
-    <div class="panel">
-      <div class="section-title">Controle do Ar-Condicionado (gRPC)</div>
-      <div class="form-row">
-        <label>Alimentação</label>
-        <div class="btn-group">
-          <button type="button" class="active" id="btnPowerOn" onclick="setPowerState(true)">LIGADO</button>
-          <button type="button" id="btnPowerOff" onclick="setPowerState(false)">DESLIGADO</button>
+    <!-- Controle Remoto AC -->
+    <div class="card">
+      <div class="card-title-row">
+        <span class="card-title">Controle Remoto de Climatização (gRPC)</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Estado de Energia do Ar-Condicionado</label>
+        <div class="toggle-container">
+          <button type="button" class="toggle-btn active" id="btnPowerOn" onclick="setPowerState(true)">LIGADO</button>
+          <button type="button" class="toggle-btn" id="btnPowerOff" onclick="setPowerState(false)">DESLIGADO</button>
         </div>
       </div>
-      <div class="form-row">
-        <label>Temperatura Alvo (°C)</label>
+      <div class="form-group">
+        <label class="form-label">Setpoint Térmico Alvo</label>
         <div class="slider-row">
-          <input type="range" id="tempRange" min="16.0" max="28.0" step="0.5" value="21.0" oninput="updateTempText(this.value)">
-          <span class="mono" id="tempText" style="min-width: 45px; font-weight: 600;">21.0°C</span>
+          <input type="range" id="tempRange" min="16.0" max="28.0" step="0.5" value="21.8" oninput="updateTempText(this.value)">
+          <span class="slider-value" id="tempText">21.8 °C</span>
         </div>
       </div>
-      <div class="form-row">
-        <label>Ventilação (%)</label>
+      <div class="form-group">
+        <label class="form-label">Velocidade de Ventoinha</label>
         <div class="slider-row">
-          <input type="range" id="fanRange" min="0" max="100" step="5" value="60" oninput="updateFanText(this.value)">
-          <span class="mono" id="fanText" style="min-width: 45px; font-weight: 600;">60%</span>
+          <input type="range" id="fanRange" min="0" max="100" step="1" value="68" oninput="updateFanText(this.value)">
+          <span class="slider-value" id="fanText">68%</span>
         </div>
       </div>
-      <button class="btn" onclick="sendAcCommand()">Enviar Atuação via Gateway</button>
+      <button class="btn-action" onclick="sendAcCommand()">Aplicar Atuação no AC</button>
     </div>
 
     <!-- Consultas Analíticas -->
-    <div class="panel">
-      <div class="section-title">Consultas Analíticas (Agregações SQLite)</div>
-      <div class="form-row">
-        <label>Tipo de Agregação</label>
-        <select class="input-control" id="queryType">
-          <option value="HOTTEST_RACK">Rack Mais Quente (Pico Térmico)</option>
-          <option value="AVG_PDU_POWER">Consumo Médio de Potência das PDUs</option>
-          <option value="THERMAL_STABILITY">Estabilidade Térmica (Desvio Padrão)</option>
+    <div class="card">
+      <div class="card-title-row">
+        <span class="card-title">Consultas Analíticas em Janela Deslizante</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tipo de Agregação (SQLite Gateway)</label>
+        <select class="select-control" id="queryType">
+          <option value="HOTTEST_RACK">🌡️ Rack Mais Quente (Pico de Temperatura)</option>
+          <option value="AVG_PDU_POWER">⚡ Consumo Médio de Potência das PDUs</option>
+          <option value="THERMAL_STABILITY">📈 Estabilidade Térmica (Desvio Padrão)</option>
         </select>
       </div>
-      <div class="form-row">
-        <label>Janela Temporal</label>
-        <select class="input-control" id="windowSec">
+      <div class="form-group">
+        <label class="form-label">Janela Temporal de Análise</label>
+        <select class="select-control" id="windowSec">
           <option value="60">Último 1 minuto (60s)</option>
           <option value="300" selected>Últimos 5 minutos (300s)</option>
           <option value="900">Últimos 15 minutos (900s)</option>
           <option value="3600">Última 1 hora (3600s)</option>
         </select>
       </div>
-      <button class="btn" onclick="executeAnalytics()">Consultar Agregação</button>
+      <button class="btn-action" onclick="executeAnalytics()">Executar Consulta</button>
 
-      <div class="analytics-output" id="analyticsBox">
+      <div class="analytics-result-box" id="analyticsBox">
         <div class="analytics-val" id="analyticsVal">--</div>
-        <div class="analytics-desc" id="analyticsDesc">Selecione uma agregação e clique no botão acima.</div>
+        <div class="analytics-desc" id="analyticsDesc">Selecione uma consulta analítica e clique em Executar.</div>
       </div>
     </div>
   </div>
+
+  <div id="toastBar"></div>
 
   <script>
     let isPowerOn = true;
@@ -346,12 +445,11 @@
     let powerChart = null;
 
     function notify(text, isError) {
-      const box = document.getElementById("notificationBar");
+      const box = document.getElementById("toastBar");
       box.innerText = text;
       box.style.display = "block";
-      box.style.background = isError ? "#fee2e2" : "#dcfce7";
-      box.style.borderColor = isError ? "#fca5a5" : "#86efac";
-      box.style.color = isError ? "#dc2626" : "#16a34a";
+      box.style.borderColor = isError ? "#dc2626" : "#0a8754";
+      box.style.color = isError ? "#dc2626" : "#0a8754";
       setTimeout(() => { box.style.display = "none"; }, 3500);
     }
 
@@ -362,7 +460,7 @@
     }
 
     function updateTempText(val) {
-      document.getElementById("tempText").innerText = parseFloat(val).toFixed(1) + "°C";
+      document.getElementById("tempText").innerText = parseFloat(val).toFixed(1) + " °C";
     }
 
     function updateFanText(val) {
@@ -384,9 +482,9 @@
           })
         });
         const data = await resp.json();
-        notify(data.message || (data.success ? "Comando aceito." : "Falha."), !data.success);
+        notify(data.message || (data.success ? "Comando aplicado." : "Falha."), !data.success);
       } catch (err) {
-        notify("Erro ao enviar comando: " + err, true);
+        notify("Erro de conexão ao atuar no AC: " + err, true);
       }
     }
 
@@ -398,9 +496,9 @@
         const data = await resp.json();
         const num = data.primary_value != null ? Number(data.primary_value).toFixed(1) : "--";
         document.getElementById("analyticsVal").innerText = num + " " + (data.unit || "");
-        document.getElementById("analyticsDesc").innerText = data.summary || "Sem registros.";
+        document.getElementById("analyticsDesc").innerText = data.summary || "Sem registros para esta janela.";
       } catch (err) {
-        document.getElementById("analyticsDesc").innerText = "Erro na requisição analítica: " + err;
+        document.getElementById("analyticsDesc").innerText = "Erro ao executar consulta: " + err;
       }
     }
 
@@ -412,20 +510,21 @@
           labels: [],
           datasets: [
             {
-              label: 'Temperatura Rack (°C)',
-              borderColor: '#0284c7',
-              backgroundColor: '#e0f2fe',
+              label: 'Sensor de Rack (°C)',
+              borderColor: '#38bdf8',
+              backgroundColor: 'rgba(56, 189, 248, 0.15)',
               data: [],
               borderWidth: 2,
               pointRadius: 2,
-              tension: 0.1
+              tension: 0.1,
+              fill: false
             },
             {
-              label: 'Alvo AC (°C)',
-              borderColor: '#d97706',
-              borderDash: [4, 4],
+              label: 'AC Setpoint Alvo (°C)',
+              borderColor: '#f59e0b',
+              borderDash: [5, 5],
               data: [],
-              borderWidth: 1.5,
+              borderWidth: 2,
               pointRadius: 0
             }
           ]
@@ -434,10 +533,23 @@
           responsive: true,
           maintainAspectRatio: false,
           scales: {
-            y: { grid: { color: '#e2e8f0' }, ticks: { color: '#475569' } },
-            x: { grid: { color: '#f1f5f9' }, ticks: { color: '#475569' } }
+            y: {
+              grid: { color: '#e2e8f0' },
+              ticks: { color: '#64748b' },
+              min: 0,
+              suggestedMax: 40
+            },
+            x: {
+              grid: { color: '#f1f5f9' },
+              ticks: { color: '#64748b' }
+            }
           },
-          plugins: { legend: { position: 'top', labels: { boxWidth: 12 } } }
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: { boxWidth: 16, color: '#0f172a' }
+            }
+          }
         }
       });
 
@@ -448,9 +560,9 @@
           labels: [],
           datasets: [
             {
-              label: 'Potência PDU (W)',
-              borderColor: '#16a34a',
-              backgroundColor: '#dcfce7',
+              label: 'Potência PDU (Watts)',
+              borderColor: '#10b981',
+              backgroundColor: 'rgba(16, 185, 129, 0.15)',
               data: [],
               borderWidth: 2,
               pointRadius: 2,
@@ -463,10 +575,23 @@
           responsive: true,
           maintainAspectRatio: false,
           scales: {
-            y: { grid: { color: '#e2e8f0' }, ticks: { color: '#475569' } },
-            x: { grid: { color: '#f1f5f9' }, ticks: { color: '#475569' } }
+            y: {
+              grid: { color: '#e2e8f0' },
+              ticks: { color: '#64748b' },
+              min: 0,
+              suggestedMax: 2000
+            },
+            x: {
+              grid: { color: '#f1f5f9' },
+              ticks: { color: '#64748b' }
+            }
           },
-          plugins: { legend: { position: 'top', labels: { boxWidth: 12 } } }
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: { boxWidth: 16, color: '#0f172a' }
+            }
+          }
         }
       });
     }
@@ -493,26 +618,33 @@
     }
 
     function renderDevices(devs) {
-      const tbody = document.getElementById("deviceTableBody");
+      const container = document.getElementById("deviceContainer");
       if (!devs || devs.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: var(--text-muted);">Nenhum dispositivo registrado no momento.</td></tr>`;
+        container.innerHTML = `<span style="color: var(--text-muted); font-size: 0.88rem;">Carregando dispositivos do Gateway...</span>`;
         return;
       }
-      tbody.innerHTML = devs.map(d => {
-        const badge = d.is_online
-          ? `<span class="badge-status badge-online">ONLINE</span>`
-          : `<span class="badge-status badge-offline">OFFLINE (&gt;15s)</span>`;
-        return `
-          <tr>
-            <td class="mono"><strong>${d.device_id}</strong></td>
-            <td>${d.device_type}</td>
-            <td class="mono">${d.ip || '127.0.0.1'}</td>
-            <td class="mono">${d.grpc_port > 0 ? d.grpc_port : '-'}</td>
-            <td>${badge}</td>
-            <td>${d.state_summary || '-'}</td>
-          </tr>
-        `;
-      }).join('');
+      container.innerHTML = `
+        <div class="device-grid">
+          ${devs.map(d => {
+            const badge = d.is_online
+              ? `<span class="badge-dev badge-dev-online">ONLINE</span>`
+              : `<span class="badge-dev badge-dev-offline">OFFLINE (&gt;15s)</span>`;
+            return `
+              <div class="device-box">
+                <div class="device-box-header">
+                  <span class="device-id">${d.device_id}</span>
+                  ${badge}
+                </div>
+                <div class="device-details">
+                  <div><strong>Tipo:</strong> ${d.device_type}</div>
+                  <div><strong>IP:</strong> ${d.ip || '127.0.0.1'}${d.grpc_port ? ':' + d.grpc_port : ''}</div>
+                  <div style="margin-top: 0.25rem; color: #334155;">${d.state_summary || '-'}</div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
     }
 
     function renderHistory(hist) {
