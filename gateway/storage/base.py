@@ -29,3 +29,9 @@ class AnalyticsProtocol(Protocol):
     def query_thermal_stability(
         self, window_seconds: int, reference_time_ms: int | None = None
     ) -> datamesh_pb2.AnalyticsResult: ...
+
+
+class GatewayStorageProtocol(TelemetryStorageProtocol, AnalyticsProtocol, Protocol):
+    """Unified storage protocol supporting telemetry persistence and analytics."""
+
+    ...

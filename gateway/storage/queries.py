@@ -1,6 +1,9 @@
 """SQL statements and schemas for DataMesh DCIM Gateway storage."""
 
 SCHEMA_DDL = """
+PRAGMA journal_mode=WAL;
+PRAGMA synchronous=NORMAL;
+
 CREATE TABLE IF NOT EXISTS telemetry (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     device_id TEXT NOT NULL,

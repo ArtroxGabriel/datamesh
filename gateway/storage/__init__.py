@@ -3,7 +3,11 @@
 import datamesh_pb2
 
 from gateway.storage.analytics import AnalyticsEngine
-from gateway.storage.base import AnalyticsProtocol, TelemetryStorageProtocol
+from gateway.storage.base import (
+    AnalyticsProtocol,
+    GatewayStorageProtocol,
+    TelemetryStorageProtocol,
+)
 from gateway.storage.sqlite import SQLiteTelemetryStorage
 
 
@@ -74,6 +78,7 @@ class TelemetryStorage:
 __all__ = [
     "AnalyticsEngine",
     "AnalyticsProtocol",
+    "GatewayStorageProtocol",
     "SQLiteTelemetryStorage",
     "TelemetryStorage",
     "TelemetryStorageProtocol",
