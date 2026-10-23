@@ -63,6 +63,7 @@ class TemperatureSensor:
         self._mcast_sock: socket.socket | None = None
 
         self._running = False
+        self._anomaly_base_c: float | None = None
         self._lock = threading.Lock()
         self._stream_thread: threading.Thread | None = None
         self._mcast_thread: threading.Thread | None = None
@@ -75,9 +76,15 @@ class TemperatureSensor:
         Example:
             packet = sensor.create_reading(temp_c=24.0)
         """
-        temperature = (
-            temp_c if temp_c is not None else round(self.base_temp_c + random.uniform(-1.5, 2.5), 2)
-        )
+        if temp_c is not None:
+            temperature = temp_c
+        elif self._anomaly_base_c is not None:
+            temperature = round(
+                max(ALERT_THRESHOLD_TEMP_C + 0.5, self._anomaly_base_c + random.uniform(-0.4, 1.2)),
+                2,
+            )
+        else:
+            temperature = round(self.base_temp_c + random.uniform(-1.5, 2.5), 2)
         alert_flag = is_alert or (temperature >= ALERT_THRESHOLD_TEMP_C)
         return datamesh_pb2.TelemetryPacket(
             device_id=self.device_id,
@@ -93,6 +100,7 @@ class TemperatureSensor:
         Example:
             alert = sensor.trigger_anomaly(temp_c=39.0)
         """
+        self._anomaly_base_c = temp_c
         alert_packet = self.create_reading(temp_c=temp_c, is_alert=True)
         self.send_telemetry(alert_packet)
         logger.warning(
@@ -161,6 +169,8 @@ class TemperatureSensor:
         """
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        if hasattr(socket, "SO_REUSEPORT"):
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
         try:
             sock.bind(("", self.multicast_port))
             mreq = struct.pack(
@@ -171,6 +181,7 @@ class TemperatureSensor:
             sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
             sock.settimeout(SOCKET_TIMEOUT_SEC)
             self._mcast_sock = sock
+            self._running = True
 
             self._mcast_thread = threading.Thread(
                 target=self._multicast_listen_loop,

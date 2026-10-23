@@ -24,7 +24,16 @@ declare -A SOURCE_PIDS=()
 declare -A SOURCE_TYPES=()
 declare -A SOURCE_PARAMS=()
 SOURCE_ORDER=()
-NEXT_RACK_IDX=3
+NEXT_TEMP_IDX=3
+NEXT_PDU_IDX=3
+
+# Limpa eventuais processos órfãos de execuções anteriores
+pkill -f "python -m gateway.main" 2>/dev/null || true
+pkill -f "python -m client.main" 2>/dev/null || true
+pkill -f "python -m sources.ac.main" 2>/dev/null || true
+pkill -f "python -m sources.temperature.main" 2>/dev/null || true
+pkill -f "/tmp/datamesh-pdu" 2>/dev/null || true
+sleep 0.3
 
 cleanup() {
     echo ""
@@ -210,26 +219,30 @@ trigger_anomaly_menu() {
 add_sensor_menu() {
     echo ""
     echo "Qual tipo de fonte deseja adicionar dinamicamente?"
-    echo "  [1] Sensor de Temperatura de Rack (descoberta pura via Multicast UDP)"
-    echo "  [2] PDU de Rack em Go"
+    echo "  [1] Sensor de Temperatura de Rack (Python)"
+    echo "  [2] PDU de Rack (Go)"
     read -r -p "Escolha [padrão: 1]: " stype
     stype="${stype:-1}"
-    local rack_num
-    rack_num=$(printf "%02d" "$NEXT_RACK_IDX")
-    NEXT_RACK_IDX=$((NEXT_RACK_IDX + 1))
 
     if [[ "$stype" == "2" ]]; then
+        local rack_num
+        rack_num=$(printf "%02d" "$NEXT_PDU_IDX")
         local new_id="pdu-rack-${rack_num}"
-        local base_w=$((1200 + (NEXT_RACK_IDX * 250)))
+        local base_w=$((1200 + (NEXT_PDU_IDX * 250)))
+        NEXT_PDU_IDX=$((NEXT_PDU_IDX + 1))
         register_source "$new_id" "pdu" "$base_w"
         start_source "$new_id" "false"
-        echo "  ⚡ Nova PDU ${new_id} (${base_w}W) iniciada (PID ${SOURCE_PIDS[$new_id]})!"
+        echo "  ⚡ Nova PDU ${new_id} (${base_w}W) iniciada (PID ${SOURCE_PIDS[$new_id]}) e já visível no Dashboard!"
     else
+        local rack_num
+        rack_num=$(printf "%02d" "$NEXT_TEMP_IDX")
         local new_id="temp-rack-${rack_num}"
         local base_t="24.5"
+        NEXT_TEMP_IDX=$((NEXT_TEMP_IDX + 1))
         register_source "$new_id" "temp" "$base_t"
-        start_source "$new_id" "true"
-        echo "  📡 Novo sensor ${new_id} iniciado aguardando beacon UDP Multicast (${MULTICAST_GROUP}:${MULTICAST_PORT})!"
+        start_source "$new_id" "false"
+        sleep 0.4
+        echo "  📡 Novo sensor ${new_id} (${base_t}°C) iniciado (PID ${SOURCE_PIDS[$new_id]}) e já visível no Dashboard!"
     fi
 }
 

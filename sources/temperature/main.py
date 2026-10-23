@@ -7,6 +7,9 @@ import sys
 import threading
 import time
 
+if hasattr(signal, "SIGUSR1"):
+    signal.signal(signal.SIGUSR1, signal.SIG_IGN)
+
 from sources.temperature.sensor import TemperatureSensor
 
 logging.basicConfig(
