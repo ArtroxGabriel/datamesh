@@ -25,20 +25,22 @@
       background-color: var(--bg);
       color: var(--text-main);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      padding: 1.25rem 2rem;
+      padding: 1.25rem 2rem 2.5rem 2rem;
       line-height: 1.4;
     }
 
-    /* Header */
+    /* Header com alinhamento estrito em linha entre branding e badges */
     header {
+      margin-bottom: 1.25rem;
+    }
+    .header-main-row {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1.25rem;
+      align-items: flex-start;
     }
     .brand {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 0.75rem;
     }
     .badge-dcim {
@@ -49,20 +51,34 @@
       padding: 0.35rem 0.65rem;
       border-radius: 6px;
       letter-spacing: 0.05em;
+      line-height: 1.2;
+      display: inline-flex;
+      align-items: center;
+      height: 28px;
     }
-    .brand-text h1 {
+    .brand-headings {
+      display: flex;
+      flex-direction: column;
+    }
+    .brand-title {
       font-size: 1.25rem;
       font-weight: 700;
       letter-spacing: -0.01em;
+      color: var(--text-main);
+      line-height: 28px;
+      margin: 0;
     }
-    .brand-text p {
+    .brand-subtitle {
       font-size: 0.8rem;
       color: var(--text-muted);
+      margin-top: 0.2rem;
+      line-height: 1.3;
     }
     .header-right {
       display: flex;
       align-items: center;
       gap: 1rem;
+      height: 28px;
     }
     .status-badge-gateway {
       background-color: var(--green);
@@ -72,9 +88,10 @@
       padding: 0.35rem 0.85rem;
       border-radius: 20px;
       letter-spacing: 0.04em;
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: 0.35rem;
+      gap: 0.4rem;
+      height: 28px;
     }
     .status-badge-gateway::before {
       content: "";
@@ -88,6 +105,7 @@
       font-size: 0.85rem;
       color: var(--text-muted);
       font-weight: 500;
+      line-height: 28px;
     }
 
     /* Cards e Containers */
@@ -213,6 +231,7 @@
       border-radius: 8px;
       padding: 2px;
       background: #ffffff;
+      height: 38px;
     }
     .toggle-btn {
       flex: 1;
@@ -225,6 +244,9 @@
       cursor: pointer;
       border-radius: 6px;
       transition: background 0.15s, color 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .toggle-btn.active {
       background: var(--primary);
@@ -238,7 +260,7 @@
     .slider-row input[type="range"] {
       flex: 1;
       height: 6px;
-      background: var(--primary);
+      background: #cbd5e1;
       border-radius: 3px;
       outline: none;
       appearance: none;
@@ -247,16 +269,25 @@
     .slider-row input[type="range"]::-webkit-slider-thumb {
       appearance: none;
       -webkit-appearance: none;
-      width: 14px;
-      height: 18px;
+      width: 12px;
+      height: 20px;
       background: #ffffff;
-      border: 2px solid var(--primary);
-      border-radius: 3px;
+      border: 1.5px solid var(--primary);
+      border-radius: 4px;
       cursor: pointer;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+    }
+    .slider-row input[type="range"]::-moz-range-thumb {
+      width: 12px;
+      height: 20px;
+      background: #ffffff;
+      border: 1.5px solid var(--primary);
+      border-radius: 4px;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.18);
     }
     .slider-value {
-      min-width: 50px;
+      min-width: 55px;
       text-align: right;
       font-family: ui-monospace, monospace;
       font-weight: 600;
@@ -265,7 +296,8 @@
     }
     select.select-control {
       width: 100%;
-      padding: 0.55rem 0.75rem;
+      height: 38px;
+      padding: 0.45rem 0.75rem;
       border: 1px solid var(--border-input);
       border-radius: 6px;
       background: #ffffff;
@@ -279,16 +311,20 @@
     .btn-action {
       display: block;
       width: 100%;
+      height: 38px;
       background: var(--primary);
       color: #ffffff;
       border: none;
       border-radius: 6px;
-      padding: 0.65rem;
+      padding: 0 1rem;
       font-weight: 600;
       font-size: 0.88rem;
       cursor: pointer;
       text-align: center;
       transition: background 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .btn-action:hover {
       background: var(--primary-hover);
@@ -297,8 +333,8 @@
     /* Caixa de Resultados Analíticos */
     .analytics-result-box {
       margin-top: 1rem;
-      background: #dbe2ea;
-      border: 1px solid #cbd5e1;
+      background: var(--result-bg);
+      border: 1px solid #94a3b8;
       border-radius: 6px;
       padding: 1rem;
     }
@@ -310,7 +346,7 @@
     }
     .analytics-desc {
       font-size: 0.82rem;
-      color: var(--text-main);
+      color: #334155;
       margin-top: 0.35rem;
     }
 
@@ -332,18 +368,20 @@
 </head>
 <body>
 
-  <!-- Top Header -->
+  <!-- Top Header com alinhamento vertical estrito na linha principal -->
   <header>
-    <div class="brand">
-      <div class="badge-dcim">DCIM</div>
-      <div class="brand-text">
-        <h1>DataMesh Monitor</h1>
-        <p>Gestão Térmica e Elétrica Distribuída em Tempo Real</p>
+    <div class="header-main-row">
+      <div class="brand">
+        <div class="badge-dcim">DCIM</div>
+        <div class="brand-headings">
+          <h1 class="brand-title">DataMesh Monitor</h1>
+          <p class="brand-subtitle">Gestão Térmica e Elétrica Distribuída em Tempo Real</p>
+        </div>
       </div>
-    </div>
-    <div class="header-right">
-      <div class="status-badge-gateway" id="gatewayStatus">GATEWAY TCP ONLINE</div>
-      <div class="clock-display" id="timeClock">--:--:--</div>
+      <div class="header-right">
+        <div class="status-badge-gateway" id="gatewayStatus">GATEWAY TCP ONLINE</div>
+        <div class="clock-display" id="timeClock">--:--:--</div>
+      </div>
     </div>
   </header>
 
@@ -459,12 +497,23 @@
       document.getElementById("btnPowerOff").classList.toggle("active", !state);
     }
 
+    function updateSliderProgress(slider) {
+      if (!slider) return;
+      const min = parseFloat(slider.min) || 0;
+      const max = parseFloat(slider.max) || 100;
+      const val = parseFloat(slider.value) || 0;
+      const pct = ((val - min) / (max - min)) * 100;
+      slider.style.background = `linear-gradient(to right, #0066cc 0%, #0066cc ${pct}%, #cbd5e1 ${pct}%, #cbd5e1 100%)`;
+    }
+
     function updateTempText(val) {
       document.getElementById("tempText").innerText = parseFloat(val).toFixed(1) + " °C";
+      updateSliderProgress(document.getElementById("tempRange"));
     }
 
     function updateFanText(val) {
       document.getElementById("fanText").innerText = val + "%";
+      updateSliderProgress(document.getElementById("fanRange"));
     }
 
     async function sendAcCommand() {
@@ -664,6 +713,8 @@
 
     window.addEventListener("DOMContentLoaded", () => {
       initCharts();
+      updateSliderProgress(document.getElementById("tempRange"));
+      updateSliderProgress(document.getElementById("fanRange"));
       poll();
       setInterval(poll, 2000);
     });
