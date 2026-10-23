@@ -50,9 +50,9 @@ Sistema distribuído de monitoramento, coleta contínua de telemetria, detecçã
 
 ## 2. Execução Rápida
 
-### Opção A — Demonstração Local Integrada (1 Comando)
+### Opção A — Console Interativo de Demonstração (Recomendado para o Vídeo)
 
-Inicia todos os 5 processos (`gateway`, `ac`, `pdu`, `client` e `temperature` com gatilho interativo `[ENTER]` no terminal):
+Inicia automaticamente o Gateway, o Cliente Web (`http://localhost:8080`) e uma topologia **multi-rack** inicial (`ac-rack-01`, `temp-rack-01`, `temp-rack-02`, `pdu-rack-01`, `pdu-rack-02`), abrindo um **menu interativo no terminal**:
 
 ```bash
 ./scripts/run_demo.sh
@@ -60,34 +60,15 @@ Inicia todos os 5 processos (`gateway`, `ac`, `pdu`, `client` e `temperature` co
 mise exec -- task demo
 ```
 
-- Acesse o Dashboard em: **http://localhost:8080**
-- Pressione **`[ENTER]`** no terminal para disparar imediatamente uma anomalia térmica crítica (`38.8 °C > 35 °C`).
-- Pressione **`Ctrl+C`** para encerrar todos os processos de forma limpa.
+No menu do terminal você pode controlar toda a demonstração ao vivo:
+- **`[1]` 🔥 Disparar anomalia térmica imediata (`> 35°C`):** envia sinal `SIGUSR1` ao sensor escolhido para transmitir imediatamente o alerta crítico (`38.8 °C [ALERTA]`) ao Gateway.
+- **`[2]` ➕ Adicionar novo sensor/PDU ao vivo:** instancia `temp-rack-03`, `pdu-rack-03`, etc. em tempo de execução para demonstrar a descoberta dinâmica via beacon UDP Multicast (`239.255.0.1:9999`).
+- **`[3]` 💥 Simular falha/desligamento de uma fonte (`ONLINE -> OFFLINE`):** encerra o processo da fonte escolhida para demonstrar a detecção passiva de falha após 15s no Dashboard.
+- **`[4]` 🔄 Religar/recuperar uma fonte parada (`OFFLINE -> ONLINE`):** reinicia a fonte em falha.
+- **`[5]` 📊 Listar estado atual dos processos da Demo.**
+- **`[6]` 📜 Exibir últimas linhas de log (`/tmp/datamesh-demo.log`).**
 
-### Opção B — Docker Compose (`network_mode: host`)
-
-Construído com builds multi-stage (`uv` slim para Python e binário estático em `scratch` para Go, executando sob usuário não-root `10001:10001`):
-
-```bash
-docker compose up --build -d
-```
-
-- Acesse o Dashboard em: **http://localhost:8080**
-- Para disparar a anomalia térmica interativa (`> 35 °C`) no container do sensor:
-  ```bash
-  docker attach $(docker compose ps -q temperature)
-  # Pressione [ENTER] para enviar o alerta imediato (Ctrl+P, Ctrl+Q para desanexar)
-  ```
-- Para simular falha/desligamento de uma fonte e observar a transição para `OFFLINE` após 15s:
-  ```bash
-  docker compose stop pdu
-  ```
-- Para encerrar:
-  ```bash
-  docker compose down
-  ```
-
-### Opção C — Execução Manual em Terminais Separados
+### Opção B — Execução Manual em Terminais Separados
 
 ```bash
 # Terminal 1 — Gateway Central

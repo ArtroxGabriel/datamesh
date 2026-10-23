@@ -33,21 +33,11 @@ tasks:
       - task: test
 
   demo:
-    desc: Launch all 5 local processes with interactive temperature anomaly trigger
+    desc: Launch interactive multi-rack demo console (Gateway, Client, AC, 2x Temp, 2x PDU)
     cmds:
       - bash scripts/run_demo.sh
 
   smoke:
-    desc: Run automated end-to-end smoke test across all 5 local processes
+    desc: Run automated end-to-end smoke test across all local processes
     cmds:
       - bash scripts/run_demo.sh --smoke
-
-  docker:up:
-    desc: Build and start all services via Docker Compose (host networking)
-    cmds:
-      - docker compose up --build -d
-
-  docker:down:
-    desc: Stop and remove Docker Compose containers
-    cmds:
-      - docker compose down
