@@ -170,10 +170,29 @@
     }
 
     /* Dispositivos */
+    .topology-group {
+      margin-bottom: 1.1rem;
+    }
+    .topology-group:last-child {
+      margin-bottom: 0;
+    }
+    .topology-group-title {
+      font-size: 0.76rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      padding-bottom: 0.3rem;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
     .device-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 1rem;
+      gap: 0.85rem;
     }
     .device-box {
       border: 1px solid var(--border);
@@ -488,6 +507,7 @@
 
   <script>
     let isPowerOn = true;
+    let activeAcDeviceId = "ac-01-carnot";
     let thermalChart = null;
     let powerChart = null;
 
@@ -533,7 +553,7 @@
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            device_id: "ac-rack-01",
+            device_id: activeAcDeviceId,
             power_on: isPowerOn,
             target_temp_c: temp,
             fan_speed_pct: fan
@@ -675,6 +695,49 @@
       }
     }
 
+    function renderDeviceCard(d) {
+      const isAlert = d.is_online && d.state_summary && d.state_summary.includes("[ALERTA]");
+      const boxClass = !d.is_online
+        ? "device-box device-box-offline"
+        : isAlert
+          ? "device-box device-box-alert"
+          : "device-box";
+      const badge = !d.is_online
+        ? `<span class="badge-dev badge-dev-offline">OFFLINE (&gt;15s)</span>`
+        : isAlert
+          ? `<span class="badge-dev badge-dev-offline">🔥 ALERTA (&gt;35°C)</span>`
+          : `<span class="badge-dev badge-dev-online">ONLINE</span>`;
+      const summaryColor = isAlert ? "#dc2626; font-weight: 700" : "#334155";
+      return `
+        <div class="${boxClass}">
+          <div class="device-box-header">
+            <span class="device-id">${d.device_id}</span>
+            ${badge}
+          </div>
+          <div class="device-details">
+            <div><strong>Tipo:</strong> ${d.device_type}</div>
+            <div><strong>IP:</strong> ${d.ip || '127.0.0.1'}${d.grpc_port ? ':' + d.grpc_port : ''}</div>
+            <div style="margin-top: 0.25rem; color: ${summaryColor};">${d.state_summary || '-'}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderGroupSection(title, items) {
+      if (!items || items.length === 0) return "";
+      return `
+        <div class="topology-group">
+          <div class="topology-group-title">
+            <span>${title}</span>
+            <span>${items.length} unidade(s)</span>
+          </div>
+          <div class="device-grid">
+            ${items.map(renderDeviceCard).join('')}
+          </div>
+        </div>
+      `;
+    }
+
     function renderDevices(devs) {
       const container = document.getElementById("deviceContainer");
       if (!devs || devs.length === 0) {
@@ -682,37 +745,18 @@
         return;
       }
       const sortedDevs = [...devs].sort((a, b) => a.device_id.localeCompare(b.device_id));
-      container.innerHTML = `
-        <div class="device-grid">
-          ${sortedDevs.map(d => {
-            const isAlert = d.is_online && d.state_summary && d.state_summary.includes("[ALERTA]");
-            const boxClass = !d.is_online
-              ? "device-box device-box-offline"
-              : isAlert
-                ? "device-box device-box-alert"
-                : "device-box";
-            const badge = !d.is_online
-              ? `<span class="badge-dev badge-dev-offline">OFFLINE (&gt;15s)</span>`
-              : isAlert
-                ? `<span class="badge-dev badge-dev-offline">🔥 ALERTA (&gt;35°C)</span>`
-                : `<span class="badge-dev badge-dev-online">ONLINE</span>`;
-            const summaryColor = isAlert ? "#dc2626; font-weight: 700" : "#334155";
-            return `
-              <div class="${boxClass}">
-                <div class="device-box-header">
-                  <span class="device-id">${d.device_id}</span>
-                  ${badge}
-                </div>
-                <div class="device-details">
-                  <div><strong>Tipo:</strong> ${d.device_type}</div>
-                  <div><strong>IP:</strong> ${d.ip || '127.0.0.1'}${d.grpc_port ? ':' + d.grpc_port : ''}</div>
-                  <div style="margin-top: 0.25rem; color: ${summaryColor};">${d.state_summary || '-'}</div>
-                </div>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      `;
+      const acDevs = sortedDevs.filter(d => d.device_type === "AIR_CONDITIONER");
+      const tempDevs = sortedDevs.filter(d => d.device_type === "TEMPERATURE_SENSOR");
+      const pduDevs = sortedDevs.filter(d => d.device_type === "RACK_PDU");
+
+      if (acDevs.length > 0) {
+        activeAcDeviceId = acDevs[0].device_id;
+      }
+
+      container.innerHTML =
+        renderGroupSection("❄️ Climatização de Precisão (Atuadores gRPC)", acDevs) +
+        renderGroupSection("🌡️ Sensores Térmicos de Rack (Event-Driven UDP)", tempDevs) +
+        renderGroupSection("⚡ Distribuição de Energia — PDUs de Rack (Go UDP)", pduDevs);
     }
 
     function renderHistory(hist) {

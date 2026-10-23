@@ -26,6 +26,17 @@ declare -A SOURCE_PARAMS=()
 SOURCE_ORDER=()
 NEXT_TEMP_IDX=3
 NEXT_PDU_IDX=3
+CODENAME_IDX=0
+
+ADJECTIVES=("frosty" "amber" "cobalt" "solar" "quantum" "crimson" "atomic" "sonic" "velvet" "hyper")
+SCIENTISTS=("fermi" "lovelace" "maxwell" "hawking" "bohr" "planck" "gauss" "dirac" "noether" "euler")
+
+generate_codename() {
+    local adj="${ADJECTIVES[$((CODENAME_IDX % ${#ADJECTIVES[@]}))]}"
+    local sci="${SCIENTISTS[$((CODENAME_IDX % ${#SCIENTISTS[@]}))]}"
+    CODENAME_IDX=$((CODENAME_IDX + 1))
+    echo "${adj}-${sci}"
+}
 
 # Limpa eventuais processos órfãos de execuções anteriores
 pkill -f "python -m gateway.main" 2>/dev/null || true
@@ -33,6 +44,7 @@ pkill -f "python -m client.main" 2>/dev/null || true
 pkill -f "python -m sources.ac.main" 2>/dev/null || true
 pkill -f "python -m sources.temperature.main" 2>/dev/null || true
 pkill -f "/tmp/datamesh-pdu" 2>/dev/null || true
+fuser -k "${GATEWAY_TCP_PORT}/tcp" "${TELEMETRY_UDP_PORT}/udp" "${WEB_PORT}/tcp" 50051/tcp >/dev/null 2>&1 || true
 sleep 0.3
 
 cleanup() {
@@ -119,12 +131,12 @@ echo "[DEMO] Iniciando Cliente Web FastAPI em http://localhost:${WEB_PORT} ..."
 GATEWAY_PORT="${GATEWAY_TCP_PORT}" "$PYTHON_BIN" -m client.main >>"$LOG_FILE" 2>&1 &
 CORE_PIDS+=($!)
 
-# Registra e inicia topologia inicial multi-rack
-register_source "ac-rack-01" "ac" "50051"
-register_source "temp-rack-01" "temp" "22.5"
-register_source "temp-rack-02" "temp" "26.0"
-register_source "pdu-rack-01" "pdu" "1400"
-register_source "pdu-rack-02" "pdu" "1850"
+# Registra e inicia topologia inicial multi-rack com codinomes estilo Docker
+register_source "ac-01-carnot" "ac" "50051"
+register_source "temp-01-turing" "temp" "22.5"
+register_source "temp-02-curie" "temp" "26.0"
+register_source "pdu-01-tesla" "pdu" "1400"
+register_source "pdu-02-faraday" "pdu" "1850"
 
 for id in "${SOURCE_ORDER[@]}"; do
     start_source "$id" "false"
@@ -135,18 +147,18 @@ if [[ "${1:-}" == "--smoke" ]]; then
     echo "[DEMO] Aguardando ingestão de telemetria da topologia multi-rack..."
     for _ in {1..30}; do
         devs="$(curl -fsS "http://127.0.0.1:${WEB_PORT}/api/devices" 2>/dev/null || true)"
-        if echo "$devs" | grep -q "pdu-rack-01" && \
-           echo "$devs" | grep -q "pdu-rack-02" && \
-           echo "$devs" | grep -q "temp-rack-01" && \
-           echo "$devs" | grep -q "temp-rack-02" && \
-           echo "$devs" | grep -q "ac-rack-01"; then
+        if echo "$devs" | grep -q "pdu-01-tesla" && \
+           echo "$devs" | grep -q "pdu-02-faraday" && \
+           echo "$devs" | grep -q "temp-01-turing" && \
+           echo "$devs" | grep -q "temp-02-curie" && \
+           echo "$devs" | grep -q "ac-01-carnot"; then
             break
         fi
         sleep 0.5
     done
 
-    echo "[DEMO] Disparando anomalia (>35°C) via SIGUSR1 em temp-rack-02..."
-    kill -USR1 "${SOURCE_PIDS["temp-rack-02"]}"
+    echo "[DEMO] Disparando anomalia (>35°C) via SIGUSR1 em temp-02-curie..."
+    kill -USR1 "${SOURCE_PIDS["temp-02-curie"]}"
     sleep 0.5
 
     echo "[DEMO] Verificando /api/devices (5 fontes ativas):"
@@ -156,7 +168,7 @@ if [[ "${1:-}" == "--smoke" ]]; then
     echo "[DEMO] Verificando /api/ac/control (atuação gRPC):"
     curl -fsS -X POST "http://127.0.0.1:${WEB_PORT}/api/ac/control" \
         -H "Content-Type: application/json" \
-        -d '{"device_id":"ac-rack-01","power_on":true,"target_temp_c":19.5,"fan_speed_pct":85}'
+        -d '{"device_id":"ac-01-carnot","power_on":true,"target_temp_c":19.5,"fan_speed_pct":85}'
     echo ""
 
     echo "[DEMO] Verificando as 3 Consultas Analíticas Agregadas:"
@@ -169,9 +181,9 @@ fi
 
 print_status_table() {
     echo ""
-    echo "----------------------------------------------------------------------"
-    printf " %-16s | %-12s | %-14s | %-18s\n" "DEVICE ID" "TIPO" "PARÂMETRO" "ESTADO DO PROCESSO"
-    echo "----------------------------------------------------------------------"
+    echo "----------------------------------------------------------------------------"
+    printf " %-22s | %-8s | %-14s | %-18s\n" "DEVICE ID" "TIPO" "PARÂMETRO" "ESTADO DO PROCESSO"
+    echo "----------------------------------------------------------------------------"
     for id in "${SOURCE_ORDER[@]}"; do
         local t="${SOURCE_TYPES[$id]}"
         local p="${SOURCE_PARAMS[$id]}"
@@ -180,12 +192,12 @@ print_status_table() {
         [[ "$t" == "pdu" ]]  && p_desc="Base ${p}W"
         [[ "$t" == "ac" ]]   && p_desc="gRPC :${p}"
         if is_running "$id"; then
-            printf " %-16s | %-12s | %-14s | \033[32mATIVO (PID %s)\033[0m\n" "$id" "$t" "$p_desc" "${SOURCE_PIDS[$id]}"
+            printf " %-22s | %-8s | %-14s | \033[32mATIVO (PID %s)\033[0m\n" "$id" "$t" "$p_desc" "${SOURCE_PIDS[$id]}"
         else
-            printf " %-16s | %-12s | %-14s | \033[31mPARADO (FALHA)\033[0m\n" "$id" "$t" "$p_desc"
+            printf " %-22s | %-8s | %-14s | \033[31mPARADO (FALHA)\033[0m\n" "$id" "$t" "$p_desc"
         fi
     done
-    echo "----------------------------------------------------------------------"
+    echo "----------------------------------------------------------------------------"
 }
 
 trigger_anomaly_menu() {
@@ -224,10 +236,15 @@ add_sensor_menu() {
     read -r -p "Escolha [padrão: 1]: " stype
     stype="${stype:-1}"
 
+    local adj="${ADJECTIVES[$((CODENAME_IDX % ${#ADJECTIVES[@]}))]}"
+    local sci="${SCIENTISTS[$((CODENAME_IDX % ${#SCIENTISTS[@]}))]}"
+    local codename="${adj}-${sci}"
+    CODENAME_IDX=$((CODENAME_IDX + 1))
+
     if [[ "$stype" == "2" ]]; then
         local rack_num
         rack_num=$(printf "%02d" "$NEXT_PDU_IDX")
-        local new_id="pdu-rack-${rack_num}"
+        local new_id="pdu-${rack_num}-${codename}"
         local base_w=$((1200 + (NEXT_PDU_IDX * 250)))
         NEXT_PDU_IDX=$((NEXT_PDU_IDX + 1))
         register_source "$new_id" "pdu" "$base_w"
@@ -236,7 +253,7 @@ add_sensor_menu() {
     else
         local rack_num
         rack_num=$(printf "%02d" "$NEXT_TEMP_IDX")
-        local new_id="temp-rack-${rack_num}"
+        local new_id="temp-${rack_num}-${codename}"
         local base_t="24.5"
         NEXT_TEMP_IDX=$((NEXT_TEMP_IDX + 1))
         register_source "$new_id" "temp" "$base_t"
