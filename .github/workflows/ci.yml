@@ -41,12 +41,10 @@ jobs:
         run: uv run ty check
 
       - name: Static Analysis (Go - go vet)
-        working-directory: sources/pdu
-        run: go vet ./...
+        run: go vet ./sources/pdu/...
 
       - name: Run Python Tests with Coverage (>=80%)
         run: uv run pytest --cov=common --cov=gateway --cov=sources --cov-report=term-missing --cov-fail-under=80
 
       - name: Run Go Tests
-        working-directory: sources/pdu
-        run: go test -v ./...
+        run: go test -v ./sources/pdu/...
