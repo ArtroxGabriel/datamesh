@@ -146,11 +146,11 @@ class GatewayCoordinator:
             sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
             sock.sendto(data, (multicast_group, multicast_port))
 
-    def start_tcp_server(self, host: str = "0.0.0.0", port: int = 8888) -> int:
+    def start_tcp_server(self, host: str = "0.0.0.0", port: int = 9997) -> int:
         """Starts TCP client listener thread on host:port, returning the bound port.
 
         Example:
-            port = coordinator.start_tcp_server("127.0.0.1", 8888)
+            port = coordinator.start_tcp_server("127.0.0.1", 9997)
         """
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

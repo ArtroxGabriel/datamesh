@@ -308,7 +308,9 @@ class AirConditionerDevice:
             AirConditionerServicer(self), server
         )
         bind_address = f"0.0.0.0:{self.grpc_port}"
-        server.add_insecure_port(bind_address)
+        bound_port = server.add_insecure_port(bind_address)
+        if bound_port > 0:
+            self.grpc_port = bound_port
         server.start()
         self._grpc_server = server
         logger.info("gRPC server for %s running on %s", self.device_id, bind_address)

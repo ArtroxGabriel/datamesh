@@ -19,7 +19,7 @@ def _load_config() -> tuple[str, int, str, int]:
     web_host = os.getenv("WEB_HOST", "0.0.0.0")
     web_port = int(os.getenv("WEB_PORT", "8080"))
     gateway_host = os.getenv("GATEWAY_HOST", "127.0.0.1")
-    gateway_port = int(os.getenv("GATEWAY_PORT", "9997"))
+    gateway_port = int(os.getenv("GATEWAY_PORT") or os.getenv("GATEWAY_TCP_PORT", "9997"))
     return web_host, web_port, gateway_host, gateway_port
 
 
