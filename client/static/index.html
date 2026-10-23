@@ -170,10 +170,29 @@
     }
 
     /* Dispositivos */
+    .topology-group {
+      margin-bottom: 1.1rem;
+    }
+    .topology-group:last-child {
+      margin-bottom: 0;
+    }
+    .topology-group-title {
+      font-size: 0.76rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      padding-bottom: 0.3rem;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
     .device-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 1rem;
+      gap: 0.85rem;
     }
     .device-box {
       border: 1px solid var(--border);
@@ -207,6 +226,15 @@
       background: #fee2e2;
       color: var(--red);
       border: 1px solid #fca5a5;
+    }
+    .device-box-alert {
+      border: 2px solid var(--red);
+      background: #fef2f2;
+    }
+    .device-box-offline {
+      border: 1.5px dashed #f87171;
+      background: #fff5f5;
+      opacity: 0.85;
     }
     .device-details {
       font-size: 0.8rem;
@@ -479,6 +507,7 @@
 
   <script>
     let isPowerOn = true;
+    let activeAcDeviceId = "ac-01-carnot";
     let thermalChart = null;
     let powerChart = null;
 
@@ -524,7 +553,7 @@
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            device_id: "ac-rack-01",
+            device_id: activeAcDeviceId,
             power_on: isPowerOn,
             target_temp_c: temp,
             fan_speed_pct: fan
@@ -650,7 +679,7 @@
       try {
         const [devResp, histResp] = await Promise.all([
           fetch("/api/devices"),
-          fetch("/api/telemetry/history?limit=30")
+          fetch("/api/telemetry/history?limit=60")
         ]);
 
         if (devResp.ok) {
@@ -666,48 +695,97 @@
       }
     }
 
+    function renderDeviceCard(d) {
+      const isAlert = d.is_online && d.state_summary && d.state_summary.includes("[ALERTA]");
+      const boxClass = !d.is_online
+        ? "device-box device-box-offline"
+        : isAlert
+          ? "device-box device-box-alert"
+          : "device-box";
+      const badge = !d.is_online
+        ? `<span class="badge-dev badge-dev-offline">OFFLINE (&gt;15s)</span>`
+        : isAlert
+          ? `<span class="badge-dev badge-dev-offline">🔥 ALERTA (&gt;35°C)</span>`
+          : `<span class="badge-dev badge-dev-online">ONLINE</span>`;
+      const summaryColor = isAlert ? "#dc2626; font-weight: 700" : "#334155";
+      return `
+        <div class="${boxClass}">
+          <div class="device-box-header">
+            <span class="device-id">${d.device_id}</span>
+            ${badge}
+          </div>
+          <div class="device-details">
+            <div><strong>Tipo:</strong> ${d.device_type}</div>
+            <div><strong>IP:</strong> ${d.ip || '127.0.0.1'}${d.grpc_port ? ':' + d.grpc_port : ''}</div>
+            <div style="margin-top: 0.25rem; color: ${summaryColor};">${d.state_summary || '-'}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderGroupSection(title, items) {
+      if (!items || items.length === 0) return "";
+      return `
+        <div class="topology-group">
+          <div class="topology-group-title">
+            <span>${title}</span>
+            <span>${items.length} unidade(s)</span>
+          </div>
+          <div class="device-grid">
+            ${items.map(renderDeviceCard).join('')}
+          </div>
+        </div>
+      `;
+    }
+
     function renderDevices(devs) {
       const container = document.getElementById("deviceContainer");
       if (!devs || devs.length === 0) {
         container.innerHTML = `<span style="color: var(--text-muted); font-size: 0.88rem;">Carregando dispositivos do Gateway...</span>`;
         return;
       }
-      container.innerHTML = `
-        <div class="device-grid">
-          ${devs.map(d => {
-            const badge = d.is_online
-              ? `<span class="badge-dev badge-dev-online">ONLINE</span>`
-              : `<span class="badge-dev badge-dev-offline">OFFLINE (&gt;15s)</span>`;
-            return `
-              <div class="device-box">
-                <div class="device-box-header">
-                  <span class="device-id">${d.device_id}</span>
-                  ${badge}
-                </div>
-                <div class="device-details">
-                  <div><strong>Tipo:</strong> ${d.device_type}</div>
-                  <div><strong>IP:</strong> ${d.ip || '127.0.0.1'}${d.grpc_port ? ':' + d.grpc_port : ''}</div>
-                  <div style="margin-top: 0.25rem; color: #334155;">${d.state_summary || '-'}</div>
-                </div>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      `;
+      const sortedDevs = [...devs].sort((a, b) => a.device_id.localeCompare(b.device_id));
+      const acDevs = sortedDevs.filter(d => d.device_type === "AIR_CONDITIONER");
+      const tempDevs = sortedDevs.filter(d => d.device_type === "TEMPERATURE_SENSOR");
+      const pduDevs = sortedDevs.filter(d => d.device_type === "RACK_PDU");
+
+      if (acDevs.length > 0) {
+        activeAcDeviceId = acDevs[0].device_id;
+      }
+
+      container.innerHTML =
+        renderGroupSection("❄️ Climatização de Precisão (Atuadores gRPC)", acDevs) +
+        renderGroupSection("🌡️ Sensores Térmicos de Rack (Event-Driven UDP)", tempDevs) +
+        renderGroupSection("⚡ Distribuição de Energia — PDUs de Rack (Go UDP)", pduDevs);
     }
 
     function renderHistory(hist) {
       if (!hist || hist.length === 0) return;
       const sorted = [...hist].reverse();
-      const labels = sorted.map(h => new Date(h.timestamp_ms).toLocaleTimeString());
 
-      thermalChart.data.labels = labels;
-      thermalChart.data.datasets[0].data = sorted.map(h => h.temperature_c > 0 ? h.temperature_c : null);
-      thermalChart.data.datasets[1].data = sorted.map(h => h.target_temp_c > 0 ? h.target_temp_c : null);
+      const thermalRows = sorted.filter(h => h.temperature_c > 0);
+      thermalChart.data.labels = thermalRows.map(
+        h => `${h.device_id} (${new Date(h.timestamp_ms).toLocaleTimeString()})`
+      );
+      thermalChart.data.datasets[0].data = thermalRows.map(h => h.temperature_c);
+      thermalChart.data.datasets[0].pointBackgroundColor = thermalRows.map(
+        h => (h.is_alert || h.temperature_c >= 35.0) ? '#dc2626' : '#38bdf8'
+      );
+      thermalChart.data.datasets[0].pointRadius = thermalRows.map(
+        h => (h.is_alert || h.temperature_c >= 35.0) ? 5 : 2
+      );
+      let lastSetpoint = 21.0;
+      thermalChart.data.datasets[1].data = thermalRows.map(h => {
+        if (h.target_temp_c > 0) lastSetpoint = h.target_temp_c;
+        return lastSetpoint;
+      });
       thermalChart.update('none');
 
-      powerChart.data.labels = labels;
-      powerChart.data.datasets[0].data = sorted.map(h => h.power_watts > 0 ? h.power_watts : null);
+      const powerRows = sorted.filter(h => h.power_watts > 0 && h.device_type === "RACK_PDU");
+      powerChart.data.labels = powerRows.map(
+        h => `${h.device_id} (${new Date(h.timestamp_ms).toLocaleTimeString()})`
+      );
+      powerChart.data.datasets[0].data = powerRows.map(h => h.power_watts);
       powerChart.update('none');
     }
 

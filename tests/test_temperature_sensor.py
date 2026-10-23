@@ -260,3 +260,31 @@ def test_custom_base_temp_and_sigusr1_anomaly_trigger(fake_socket: FakeUDPSocket
     assert dispatched.device_id == "temp-rack-02"
     assert dispatched.is_alert is True
     assert dispatched.temperature_c >= ALERT_THRESHOLD_TEMP_C
+
+    # Subsequent periodic readings must remain in anomaly state (> 35 C) so dashboard shows alert
+    next_reading = sensor.create_reading()
+    assert next_reading.is_alert is True
+    assert next_reading.temperature_c >= ALERT_THRESHOLD_TEMP_C
+
+
+def test_start_multicast_listener_before_start_keeps_listener_thread_alive() -> None:
+    # Arrange: get a free port to bind multicast listener
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.bind(("", 0))
+        free_port = s.getsockname()[1]
+
+    sensor = TemperatureSensor(
+        device_id="temp-mcast-order",
+        multicast_port=free_port,
+        send_interval_sec=0.5,
+    )
+    try:
+        # Act: call start_multicast_listener() BEFORE start(), matching sources/temperature/main.py
+        sensor.start_multicast_listener()
+        sensor.start()
+
+        # Assert: multicast listener thread must still be alive
+        assert sensor._mcast_thread is not None
+        assert sensor._mcast_thread.is_alive() is True
+    finally:
+        sensor.stop()
