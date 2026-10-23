@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DataMesh DCIM — Painel de Controle</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --panel: #ffffff;
+      --border: #cbd5e1;
+      --border-dark: #94a3b8;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --primary: #0284c7;
+      --primary-hover: #0369a1;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --warning: #d97706;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding: 1.25rem;
+      line-height: 1.4;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 1rem;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 1.25rem;
+    }
+    .header-title h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .header-title p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+    .header-status {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-family: monospace;
+      font-size: 0.85rem;
+    }
+    .badge-status {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 2px;
+    }
+    .badge-online {
+      background: #dcfce7;
+      color: var(--success);
+      border-color: #86efac;
+    }
+    .badge-offline {
+      background: #fee2e2;
+      color: var(--danger);
+      border-color: #fca5a5;
+    }
+
+    /* Grids e Painéis Diretos */
+    .section-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .grid-two {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    @media (max-width: 900px) {
+      .grid-two { grid-template-columns: 1fr; }
+    }
+
+    /* Tabela de Dispositivos */
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+    table.data-table th, table.data-table td {
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+    }
+    table.data-table th {
+      background: #f1f5f9;
+      font-weight: 600;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+    table.data-table tr:hover {
+      background: #f8fafc;
+    }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    /* Gráficos */
+    .chart-box {
+      position: relative;
+      height: 240px;
+      width: 100%;
+    }
+
+    /* Formulários e Ações */
+    .form-row {
+      margin-bottom: 0.75rem;
+    }
+    .form-row label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+      color: var(--text-muted);
+    }
+    .input-control {
+      width: 100%;
+      padding: 0.45rem 0.6rem;
+      border: 1px solid var(--border-dark);
+      background: #fff;
+      color: var(--text-main);
+      font-size: 0.88rem;
+      border-radius: 2px;
+      outline: none;
+    }
+    .input-control:focus {
+      border-color: var(--primary);
+    }
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .slider-row input[type="range"] {
+      flex: 1;
+    }
+    .btn {
+      display: inline-block;
+      width: 100%;
+      padding: 0.55rem 1rem;
+      font-weight: 600;
+      font-size: 0.88rem;
+      text-align: center;
+      border: 1px solid var(--primary);
+      background: var(--primary);
+      color: #fff;
+      cursor: pointer;
+      border-radius: 2px;
+    }
+    .btn:hover {
+      background: var(--primary-hover);
+    }
+    .btn-group {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .btn-group button {
+      flex: 1;
+      padding: 0.4rem;
+      border: 1px solid var(--border-dark);
+      background: #f1f5f9;
+      color: var(--text-muted);
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 2px;
+    }
+    .btn-group button.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    /* Bloco de Resultado Analítico */
+    .analytics-output {
+      margin-top: 0.75rem;
+      padding: 0.75rem;
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      border-radius: 2px;
+    }
+    .analytics-val {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--primary);
+      font-family: ui-monospace, monospace;
+    }
+    .analytics-desc {
+      font-size: 0.85rem;
+      margin-top: 0.25rem;
+      color: var(--text-main);
+    }
+
+    /* Mensagem / Alerta */
+    #notificationBar {
+      display: none;
+      padding: 0.6rem 0.8rem;
+      margin-bottom: 1rem;
+      border: 1px solid var(--border);
+      font-size: 0.85rem;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-title">
+      <h1>DataMesh DCIM — Console de Operação</h1>
+      <p>Cliente Web via TCP Protobuf / Gateway Central</p>
+    </div>
+    <div class="header-status">
+      <span class="badge-status badge-online" id="netStatus">TCP CONECTADO</span>
+      <span id="timeClock">--:--:--</span>
+    </div>
+  </header>
+
+  <div id="notificationBar"></div>
+
+  <!-- Topologia de Fontes -->
+  <div class="section-title">Fontes de Dados Conectadas (Discovery & Telemetria)</div>
+  <div class="panel">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Dispositivo</th>
+          <th>Tipo</th>
+          <th>Endereço IP</th>
+          <th>Porta gRPC</th>
+          <th>Estado</th>
+          <th>Última Telemetria</th>
+        </tr>
+      </thead>
+      <tbody id="deviceTableBody">
+        <tr>
+          <td colspan="6" style="text-align:center; color: var(--text-muted);">Consultando Gateway via TCP...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Gráficos de Séries Temporais -->
+  <div class="grid-two">
+    <div class="panel">
+      <div class="section-title" style="display:flex; justify-content:space-between;">
+        <span>Monitoramento Térmico (°C)</span>
+        <span style="color: var(--danger); font-size: 0.75rem;">Limiar Alerta: 35.0 °C</span>
+      </div>
+      <div class="chart-box">
+        <canvas id="thermalChart"></canvas>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="section-title">Telemetria Elétrica — PDU (Watts)</div>
+      <div class="chart-box">
+        <canvas id="powerChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Controles e Consultas -->
+  <div class="grid-two">
+    <!-- Atuação AC -->
+    <div class="panel">
+      <div class="section-title">Controle do Ar-Condicionado (gRPC)</div>
+      <div class="form-row">
+        <label>Alimentação</label>
+        <div class="btn-group">
+          <button type="button" class="active" id="btnPowerOn" onclick="setPowerState(true)">LIGADO</button>
+          <button type="button" id="btnPowerOff" onclick="setPowerState(false)">DESLIGADO</button>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Temperatura Alvo (°C)</label>
+        <div class="slider-row">
+          <input type="range" id="tempRange" min="16.0" max="28.0" step="0.5" value="21.0" oninput="updateTempText(this.value)">
+          <span class="mono" id="tempText" style="min-width: 45px; font-weight: 600;">21.0°C</span>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Ventilação (%)</label>
+        <div class="slider-row">
+          <input type="range" id="fanRange" min="0" max="100" step="5" value="60" oninput="updateFanText(this.value)">
+          <span class="mono" id="fanText" style="min-width: 45px; font-weight: 600;">60%</span>
+        </div>
+      </div>
+      <button class="btn" onclick="sendAcCommand()">Enviar Atuação via Gateway</button>
+    </div>
+
+    <!-- Consultas Analíticas -->
+    <div class="panel">
+      <div class="section-title">Consultas Analíticas (Agregações SQLite)</div>
+      <div class="form-row">
+        <label>Tipo de Agregação</label>
+        <select class="input-control" id="queryType">
+          <option value="HOTTEST_RACK">Rack Mais Quente (Pico Térmico)</option>
+          <option value="AVG_PDU_POWER">Consumo Médio de Potência das PDUs</option>
+          <option value="THERMAL_STABILITY">Estabilidade Térmica (Desvio Padrão)</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Janela Temporal</label>
+        <select class="input-control" id="windowSec">
+          <option value="60">Último 1 minuto (60s)</option>
+          <option value="300" selected>Últimos 5 minutos (300s)</option>
+          <option value="900">Últimos 15 minutos (900s)</option>
+          <option value="3600">Última 1 hora (3600s)</option>
+        </select>
+      </div>
+      <button class="btn" onclick="executeAnalytics()">Consultar Agregação</button>
+
+      <div class="analytics-output" id="analyticsBox">
+        <div class="analytics-val" id="analyticsVal">--</div>
+        <div class="analytics-desc" id="analyticsDesc">Selecione uma agregação e clique no botão acima.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let isPowerOn = true;
+    let thermalChart = null;
+    let powerChart = null;
+
+    function notify(text, isError) {
+      const box = document.getElementById("notificationBar");
+      box.innerText = text;
+      box.style.display = "block";
+      box.style.background = isError ? "#fee2e2" : "#dcfce7";
+      box.style.borderColor = isError ? "#fca5a5" : "#86efac";
+      box.style.color = isError ? "#dc2626" : "#16a34a";
+      setTimeout(() => { box.style.display = "none"; }, 3500);
+    }
+
+    function setPowerState(state) {
+      isPowerOn = state;
+      document.getElementById("btnPowerOn").classList.toggle("active", state);
+      document.getElementById("btnPowerOff").classList.toggle("active", !state);
+    }
+
+    function updateTempText(val) {
+      document.getElementById("tempText").innerText = parseFloat(val).toFixed(1) + "°C";
+    }
+
+    function updateFanText(val) {
+      document.getElementById("fanText").innerText = val + "%";
+    }
+
+    async function sendAcCommand() {
+      const temp = parseFloat(document.getElementById("tempRange").value);
+      const fan = parseInt(document.getElementById("fanRange").value, 10);
+      try {
+        const resp = await fetch("/api/ac/control", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            device_id: "ac-rack-01",
+            power_on: isPowerOn,
+            target_temp_c: temp,
+            fan_speed_pct: fan
+          })
+        });
+        const data = await resp.json();
+        notify(data.message || (data.success ? "Comando aceito." : "Falha."), !data.success);
+      } catch (err) {
+        notify("Erro ao enviar comando: " + err, true);
+      }
+    }
+
+    async function executeAnalytics() {
+      const q = document.getElementById("queryType").value;
+      const w = document.getElementById("windowSec").value;
+      try {
+        const resp = await fetch(`/api/analytics/${q}?window_seconds=${w}`);
+        const data = await resp.json();
+        const num = data.primary_value != null ? Number(data.primary_value).toFixed(1) : "--";
+        document.getElementById("analyticsVal").innerText = num + " " + (data.unit || "");
+        document.getElementById("analyticsDesc").innerText = data.summary || "Sem registros.";
+      } catch (err) {
+        document.getElementById("analyticsDesc").innerText = "Erro na requisição analítica: " + err;
+      }
+    }
+
+    function initCharts() {
+      const tCtx = document.getElementById("thermalChart").getContext("2d");
+      thermalChart = new Chart(tCtx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: 'Temperatura Rack (°C)',
+              borderColor: '#0284c7',
+              backgroundColor: '#e0f2fe',
+              data: [],
+              borderWidth: 2,
+              pointRadius: 2,
+              tension: 0.1
+            },
+            {
+              label: 'Alvo AC (°C)',
+              borderColor: '#d97706',
+              borderDash: [4, 4],
+              data: [],
+              borderWidth: 1.5,
+              pointRadius: 0
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { grid: { color: '#e2e8f0' }, ticks: { color: '#475569' } },
+            x: { grid: { color: '#f1f5f9' }, ticks: { color: '#475569' } }
+          },
+          plugins: { legend: { position: 'top', labels: { boxWidth: 12 } } }
+        }
+      });
+
+      const pCtx = document.getElementById("powerChart").getContext("2d");
+      powerChart = new Chart(pCtx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: 'Potência PDU (W)',
+              borderColor: '#16a34a',
+              backgroundColor: '#dcfce7',
+              data: [],
+              borderWidth: 2,
+              pointRadius: 2,
+              fill: true,
+              tension: 0.1
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { grid: { color: '#e2e8f0' }, ticks: { color: '#475569' } },
+            x: { grid: { color: '#f1f5f9' }, ticks: { color: '#475569' } }
+          },
+          plugins: { legend: { position: 'top', labels: { boxWidth: 12 } } }
+        }
+      });
+    }
+
+    async function poll() {
+      document.getElementById("timeClock").innerText = new Date().toLocaleTimeString();
+      try {
+        const [devResp, histResp] = await Promise.all([
+          fetch("/api/devices"),
+          fetch("/api/telemetry/history?limit=30")
+        ]);
+
+        if (devResp.ok) {
+          const devs = await devResp.json();
+          renderDevices(devs);
+        }
+        if (histResp.ok) {
+          const hist = await histResp.json();
+          renderHistory(hist);
+        }
+      } catch (err) {
+        console.warn("Poll failure:", err);
+      }
+    }
+
+    function renderDevices(devs) {
+      const tbody = document.getElementById("deviceTableBody");
+      if (!devs || devs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: var(--text-muted);">Nenhum dispositivo registrado no momento.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = devs.map(d => {
+        const badge = d.is_online
+          ? `<span class="badge-status badge-online">ONLINE</span>`
+          : `<span class="badge-status badge-offline">OFFLINE (&gt;15s)</span>`;
+        return `
+          <tr>
+            <td class="mono"><strong>${d.device_id}</strong></td>
+            <td>${d.device_type}</td>
+            <td class="mono">${d.ip || '127.0.0.1'}</td>
+            <td class="mono">${d.grpc_port > 0 ? d.grpc_port : '-'}</td>
+            <td>${badge}</td>
+            <td>${d.state_summary || '-'}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderHistory(hist) {
+      if (!hist || hist.length === 0) return;
+      const sorted = [...hist].reverse();
+      const labels = sorted.map(h => new Date(h.timestamp_ms).toLocaleTimeString());
+
+      thermalChart.data.labels = labels;
+      thermalChart.data.datasets[0].data = sorted.map(h => h.temperature_c > 0 ? h.temperature_c : null);
+      thermalChart.data.datasets[1].data = sorted.map(h => h.target_temp_c > 0 ? h.target_temp_c : null);
+      thermalChart.update('none');
+
+      powerChart.data.labels = labels;
+      powerChart.data.datasets[0].data = sorted.map(h => h.power_watts > 0 ? h.power_watts : null);
+      powerChart.update('none');
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      initCharts();
+      poll();
+      setInterval(poll, 2000);
+    });
+  </script>
+</body>
+</html>
