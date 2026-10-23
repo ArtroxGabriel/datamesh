@@ -351,3 +351,16 @@ def test_gateway_app_lifecycle() -> None:
     assert app._running is True
     app.stop()
     assert app._running is False
+
+
+def test_gateway_and_client_share_default_tcp_port() -> None:
+    from client.gateway_client import DEFAULT_GATEWAY_PORT
+    from client.main import _load_config
+    from gateway.main import DEFAULT_TCP_PORT, GatewayApp
+
+    app = GatewayApp(db_path=":memory:")
+    _, _, _, client_gw_port = _load_config()
+
+    assert DEFAULT_TCP_PORT == DEFAULT_GATEWAY_PORT == 9997
+    assert app.tcp_port == client_gw_port == 9997
+    app.stop()

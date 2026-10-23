@@ -232,6 +232,16 @@ def test_main_load_config(monkeypatch: pytest.MonkeyPatch) -> None:
     assert gw_port == 9900
 
 
+def test_main_load_config_respects_gateway_tcp_port(monkeypatch: pytest.MonkeyPatch) -> None:
+    from client.main import _load_config
+
+    monkeypatch.delenv("GATEWAY_PORT", raising=False)
+    monkeypatch.setenv("GATEWAY_TCP_PORT", "9876")
+
+    _, _, _, gw_port = _load_config()
+    assert gw_port == 9876
+
+
 def test_serve_dashboard_returns_html(test_client: TestClient) -> None:
     # Act
     resp = test_client.get("/")

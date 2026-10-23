@@ -1,0 +1,42 @@
+# syntax=docker/dockerfile:1
+
+ARG GO_VERSION=1.23
+
+# Stage 1: Dedicated Go Builder
+FROM golang:${GO_VERSION}-alpine AS builder
+
+RUN apk add --no-cache ca-certificates tzdata && \
+    echo "appuser:x:10001:10001:appuser:/:/sbin/nologin" > /etc/passwd.minimal && \
+    echo "appgroup:x:10001:" > /etc/group.minimal
+
+WORKDIR /build/sources/pdu
+
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=bind,source=gen/go,target=/build/gen/go \
+    --mount=type=bind,source=sources/pdu/go.mod,target=/build/sources/pdu/go.mod \
+    --mount=type=bind,source=sources/pdu/go.sum,target=/build/sources/pdu/go.sum \
+    go mod download
+
+COPY gen/go /build/gen/go
+COPY sources/pdu /build/sources/pdu
+
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux go build \
+    -trimpath \
+    -ldflags='-s -w -extldflags "-static"' \
+    -o /out/pdu ./cmd/main.go
+
+# Stage 2: Zero-Overhead Scratch Runtime
+FROM scratch AS runtime
+
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
+COPY --from=builder /etc/passwd.minimal /etc/passwd
+COPY --from=builder /etc/group.minimal /etc/group
+COPY --from=builder --chown=10001:10001 /out/pdu /pdu
+
+USER 10001:10001
+STOPSIGNAL SIGTERM
+
+ENTRYPOINT ["/pdu"]

@@ -22,6 +22,9 @@ logger = logging.getLogger("gateway")
 UDP_BUFFER_SIZE = 65535
 BEACON_INTERVAL_SECONDS = 5.0
 DEFAULT_SOCKET_TIMEOUT_SEC = 0.5
+DEFAULT_TCP_PORT = 9997
+DEFAULT_UDP_PORT = 9998
+DEFAULT_MULTICAST_PORT = 9999
 
 
 class GatewayApp:
@@ -30,10 +33,10 @@ class GatewayApp:
     def __init__(
         self,
         host: str = "0.0.0.0",
-        tcp_port: int = 8888,
-        udp_port: int = 9998,
+        tcp_port: int = DEFAULT_TCP_PORT,
+        udp_port: int = DEFAULT_UDP_PORT,
         multicast_group: str = "239.255.0.1",
-        multicast_port: int = 9999,
+        multicast_port: int = DEFAULT_MULTICAST_PORT,
         db_path: str = "datamesh.db",
         advertised_ip: str | None = None,
     ) -> None:
@@ -134,10 +137,10 @@ class GatewayApp:
 
 def main() -> None:
     host = os.getenv("GATEWAY_HOST", "0.0.0.0")
-    tcp_port = int(os.getenv("GATEWAY_TCP_PORT", "8888"))
-    udp_port = int(os.getenv("TELEMETRY_UDP_PORT", "9998"))
+    tcp_port = int(os.getenv("GATEWAY_TCP_PORT", str(DEFAULT_TCP_PORT)))
+    udp_port = int(os.getenv("TELEMETRY_UDP_PORT", str(DEFAULT_UDP_PORT)))
     multicast_group = os.getenv("MULTICAST_GROUP", "239.255.0.1")
-    multicast_port = int(os.getenv("MULTICAST_PORT", "9999"))
+    multicast_port = int(os.getenv("MULTICAST_PORT", str(DEFAULT_MULTICAST_PORT)))
     db_path = os.getenv("DB_PATH", "datamesh.db")
 
     app = GatewayApp(
