@@ -45,7 +45,7 @@ jobs:
         run: go vet ./...
 
       - name: Run Python Tests with Coverage (>=80%)
-        run: uv run pytest --cov=common --cov-report=term-missing --cov-fail-under=80
+        run: uv run pytest --cov=common --cov=gateway --cov-report=term-missing --cov-fail-under=80
 
       - name: Run Go Tests
         working-directory: sources/pdu
