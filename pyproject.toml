@@ -24,7 +24,10 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = [".", "gen/python"]
 testpaths = ["tests"]
-addopts = "-q"
+addopts = "-q --cov --cov-report=term-missing --cov-fail-under=80"
+
+[tool.coverage.run]
+source = ["common", "gateway", "sources", "client"]
 
 [tool.ruff]
 line-length = 100
