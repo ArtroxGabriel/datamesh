@@ -49,10 +49,10 @@ docs/, proto/, gen/, gateway/, sources/, client/, scripts/
   `uv run python -m client.main` (acessível em `http://localhost:8080`)
 - Testes:
   - Python: `uv run pytest`
-  - Go: `mise exec -- go test ./...`
+  - Go: `mise exec -- go test ./sources/pdu/...`
 - Linters, Checagem de Tipos & Formatação:
   - Python: `uv run ty check` (type checking da Astral: <https://docs.astral.sh/ty/>), `uv run ruff check .` e `uv run ruff format .`
-  - Go: `mise exec -- go vet ./...` e `mise exec -- gofmt -w .`
+  - Go: `mise exec -- go vet ./sources/pdu/...` e `mise exec -- gofmt -w ./sources/pdu`
 
 ## Environment / Setup
 
