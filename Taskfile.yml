@@ -22,7 +22,7 @@ tasks:
   test:
     desc: Run Python and Go test suites with coverage check (>=80%)
     cmds:
-      - uv run pytest --cov=common --cov-report=term-missing --cov-fail-under=80
+      - uv run pytest --cov=common --cov=gateway --cov-report=term-missing --cov-fail-under=80
       - cd sources/pdu && go test -v ./...
 
   check:
