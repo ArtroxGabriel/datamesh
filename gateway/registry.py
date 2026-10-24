@@ -28,6 +28,23 @@ def _build_state_summary(packet: datamesh_pb2.TelemetryPacket) -> str:
     return f"Temp: {packet.temperature_c:.1f} °C{alert}"
 
 
+def _merge_announcement(
+    existing: datamesh_pb2.DeviceInfo, announcement: datamesh_pb2.DeviceInfo
+) -> None:
+    """Fills network identity from a re-announcement without clobbering telemetry state.
+
+    Sources re-announce on every discovery beacon (every 5s). Replacing the whole entry made
+    the dashboard flip between the live reading and the announcement's static text, and could
+    hide an active "[ALERTA]" until the next telemetry packet arrived.
+    """
+    existing.ip = announcement.ip or existing.ip
+    existing.grpc_port = announcement.grpc_port or existing.grpc_port
+    existing.device_type = announcement.device_type or existing.device_type
+    existing.last_seen_ms = max(existing.last_seen_ms, announcement.last_seen_ms)
+    if not existing.state_summary:
+        existing.state_summary = announcement.state_summary
+
+
 class DeviceRegistry:
     """Thread-safe registry of connected data sources with passive failure tracking."""
 
@@ -47,7 +64,11 @@ class DeviceRegistry:
             device_copy.last_seen_ms = _now_ms()
 
         with self._lock:
-            self._devices[device_copy.device_id] = device_copy
+            existing = self._devices.get(device_copy.device_id)
+            if existing is None:
+                self._devices[device_copy.device_id] = device_copy
+            else:
+                _merge_announcement(existing, device_copy)
 
     def update_from_telemetry(self, packet: datamesh_pb2.TelemetryPacket) -> None:
         """Updates device timestamp and summary from periodic or alert telemetry.
