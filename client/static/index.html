@@ -516,6 +516,9 @@
     const HISTORY_WINDOW_MS = 120000;
     const HISTORY_LIMIT = 400;
     const ALERT_THRESHOLD_C = 35.0;
+    // Longer than a couple of missed packets (sources send every 2-5s), so only real outages
+    // break the line instead of Chart.js bridging the downtime with a straight segment.
+    const GAP_THRESHOLD_MS = 10000;
     // Categorical slots validated for CVD on the white card surface; red stays reserved for alerts.
     const SERIES_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6'];
     const OVERFLOW_COLOR = '#94a3b8';
@@ -739,7 +742,21 @@
         if (!groups.has(row.device_id)) groups.set(row.device_id, []);
         groups.get(row.device_id).push(toPoint(row));
       }
-      return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+      return [...groups.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([id, points]) => [id, withGaps(points)]);
+    }
+
+    function withGaps(points) {
+      const result = [];
+      for (const point of points) {
+        const prev = result[result.length - 1];
+        if (prev && point.x - prev.x > GAP_THRESHOLD_MS) {
+          result.push({ x: prev.x + 1, y: null });
+        }
+        result.push(point);
+      }
+      return result;
     }
 
     function deviceSeries(deviceId, points, color) {
