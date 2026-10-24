@@ -101,6 +101,14 @@
       background-color: #ffffff;
       border-radius: 50%;
     }
+    .nav-link {
+      color: var(--primary);
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-decoration: none;
+      line-height: 28px;
+    }
+    .nav-link:hover { text-decoration: underline; }
     .clock-display {
       font-size: 0.85rem;
       color: var(--text-muted);
@@ -407,6 +415,7 @@
         </div>
       </div>
       <div class="header-right">
+        <a class="nav-link" href="/events">Linha do tempo de eventos →</a>
         <div class="status-badge-gateway" id="gatewayStatus">GATEWAY TCP ONLINE</div>
         <div class="clock-display" id="timeClock">--:--:--</div>
       </div>

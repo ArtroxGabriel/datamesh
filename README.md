@@ -127,6 +127,7 @@ O sistema é dividido em três camadas estritamente desacopladas (**Fontes de Da
   - Agrupa os dispositivos conectados em **3 categorias visuais** (*Climatização AC*, *Sensores Térmicos de Rack* e *PDUs de Rack*).
   - Destaca imediatamente em vermelho (`🔥 ALERTA (>35°C)`) sensores em estado de anomalia térmica e sinaliza fontes inativas (`OFFLINE (>15s)`).
   - Exibe gráficos em tempo real de séries temporais térmicas e elétricas, painel de controle gRPC do AC e execução interativa das 3 consultas analíticas.
+- **`client/events.py` & `client/static/events.html` (`/events`):** Linha do tempo de eventos com filtros por categoria — fontes registradas no Gateway, transições `ONLINE`/`OFFLINE`, início e fim de alertas térmicos (com o timestamp do próprio pacote), comandos gRPC enviados ao AC e consultas analíticas executadas. Os eventos são detectados no processo do Cliente por uma thread que consulta o Gateway via TCP a cada 1s, então o histórico cobre toda a demonstração mesmo que a página seja aberta depois.
 
 ---
 
