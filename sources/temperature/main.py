@@ -10,7 +10,11 @@ import time
 if hasattr(signal, "SIGUSR1"):
     signal.signal(signal.SIGUSR1, signal.SIG_IGN)
 
-from sources.temperature.sensor import TemperatureSensor
+from sources.temperature.sensor import (
+    DEFAULT_ANOMALY_DECAY_SEC,
+    DEFAULT_ANOMALY_HOLD_SEC,
+    TemperatureSensor,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -48,6 +52,12 @@ def _load_config() -> tuple[str, str | None, int | None, float, str, int, float]
     return sensor_id, gateway_host, gateway_port, interval_sec, mcast_group, mcast_port, base_temp_c
 
 
+def _load_anomaly_timing() -> tuple[float, float]:
+    hold_sec = float(os.getenv("ANOMALY_HOLD_SEC", str(DEFAULT_ANOMALY_HOLD_SEC)))
+    decay_sec = float(os.getenv("ANOMALY_DECAY_SEC", str(DEFAULT_ANOMALY_DECAY_SEC)))
+    return hold_sec, decay_sec
+
+
 def _setup_signals(sensor: TemperatureSensor, stop_event: threading.Event, sensor_id: str) -> None:
     def _shutdown(_sig: int, _frame: object) -> None:
         logger.info("Shutdown signal received for %s. Stopping...", sensor_id)
@@ -66,6 +76,7 @@ def _setup_signals(sensor: TemperatureSensor, stop_event: threading.Event, senso
 
 def main() -> None:
     s_id, gw_host, gw_port, interval, mc_grp, mc_port, base_temp = _load_config()
+    hold_sec, decay_sec = _load_anomaly_timing()
     sensor = TemperatureSensor(
         device_id=s_id,
         gateway_host=gw_host,
@@ -74,6 +85,8 @@ def main() -> None:
         multicast_group=mc_grp,
         multicast_port=mc_port,
         base_temp_c=base_temp,
+        anomaly_hold_sec=hold_sec,
+        anomaly_decay_sec=decay_sec,
     )
     stop_event = threading.Event()
     _setup_signals(sensor, stop_event, s_id)

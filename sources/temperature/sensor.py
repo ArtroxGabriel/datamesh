@@ -1,6 +1,7 @@
 """Rack Temperature Sensor source with continuous UDP streaming and immediate anomaly alerts."""
 
 import logging
+import math
 import random
 import socket
 import struct
@@ -15,6 +16,14 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_BASE_TEMP_C = 23.5
 ALERT_THRESHOLD_TEMP_C = 35.0
+# Hysteresis: alert only clears well below the trigger so sensor noise near 35 °C doesn't flap it.
+ALERT_CLEAR_TEMP_C = 33.0
+# Anomaly lifecycle: hot plateau (long enough to show on the dashboard), then exponential cooling.
+DEFAULT_ANOMALY_HOLD_SEC = 20.0
+DEFAULT_ANOMALY_DECAY_SEC = 10.0
+MIN_ANOMALY_DECAY_SEC = 0.1
+ANOMALY_SETTLED_EXCESS_C = 0.5
+ANOMALY_NOISE_C = 0.4
 DEFAULT_INTERVAL_SECONDS = 3.0
 DEFAULT_MULTICAST_GROUP = "239.255.0.1"
 DEFAULT_MULTICAST_PORT = 9999
@@ -47,6 +56,9 @@ class TemperatureSensor:
         multicast_port: int = DEFAULT_MULTICAST_PORT,
         base_temp_c: float = DEFAULT_BASE_TEMP_C,
         socket_factory: Callable[[], UDPSocketProtocol] | None = None,
+        anomaly_hold_sec: float = DEFAULT_ANOMALY_HOLD_SEC,
+        anomaly_decay_sec: float = DEFAULT_ANOMALY_DECAY_SEC,
+        clock: Callable[[], float] | None = None,
     ) -> None:
         self.device_id = device_id
         self.gateway_host = gateway_host
@@ -55,6 +67,9 @@ class TemperatureSensor:
         self.multicast_group = multicast_group
         self.multicast_port = multicast_port
         self.base_temp_c = base_temp_c
+        self.anomaly_hold_sec = anomaly_hold_sec
+        self.anomaly_decay_sec = max(anomaly_decay_sec, MIN_ANOMALY_DECAY_SEC)
+        self._clock: Callable[[], float] = clock or time.monotonic
 
         self._socket_factory: Callable[[], UDPSocketProtocol] = socket_factory or (
             lambda: socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -63,7 +78,9 @@ class TemperatureSensor:
         self._mcast_sock: socket.socket | None = None
 
         self._running = False
-        self._anomaly_base_c: float | None = None
+        # (peak_c, started_at) kept as one tuple so the signal handler swaps it atomically.
+        self._anomaly: tuple[float, float] | None = None
+        self._alert_active = False
         self._lock = threading.Lock()
         self._stream_thread: threading.Thread | None = None
         self._mcast_thread: threading.Thread | None = None
@@ -76,37 +93,62 @@ class TemperatureSensor:
         Example:
             packet = sensor.create_reading(temp_c=24.0)
         """
-        if temp_c is not None:
-            temperature = temp_c
-        elif self._anomaly_base_c is not None:
-            temperature = round(
-                max(ALERT_THRESHOLD_TEMP_C + 0.5, self._anomaly_base_c + random.uniform(-0.4, 1.2)),
-                2,
-            )
-        else:
-            temperature = round(self.base_temp_c + random.uniform(-1.5, 2.5), 2)
-        alert_flag = is_alert or (temperature >= ALERT_THRESHOLD_TEMP_C)
+        temperature = temp_c if temp_c is not None else self._simulate_temperature()
         return datamesh_pb2.TelemetryPacket(
             device_id=self.device_id,
             device_type=datamesh_pb2.TEMPERATURE_SENSOR,
             timestamp_ms=_now_ms(),
-            is_alert=alert_flag,
+            is_alert=self._update_alert_state(temperature, forced=is_alert),
             temperature_c=temperature,
         )
+
+    def _simulate_temperature(self) -> float:
+        excess_c = self._anomaly_excess_c()
+        if excess_c is None:
+            return round(self.base_temp_c + random.uniform(-1.5, 2.5), 2)
+        noise_c = random.uniform(-ANOMALY_NOISE_C, ANOMALY_NOISE_C)
+        return round(self.base_temp_c + excess_c + noise_c, 2)
+
+    def _anomaly_excess_c(self) -> float | None:
+        """Heat above base: flat during the hold window, then decays exponentially to zero."""
+        anomaly = self._anomaly
+        if anomaly is None:
+            return None
+        peak_c, started_at = anomaly
+        cooling_sec = self._clock() - started_at - self.anomaly_hold_sec
+        excess_c = peak_c - self.base_temp_c
+        if cooling_sec > 0:
+            excess_c *= math.exp(-cooling_sec / self.anomaly_decay_sec)
+        if excess_c >= ANOMALY_SETTLED_EXCESS_C:
+            return excess_c
+        if self._anomaly is anomaly:  # don't discard an anomaly re-triggered meanwhile
+            self._anomaly = None
+            logger.info("Anomaly on %s dissipated; back to nominal readings", self.device_id)
+        return None
+
+    def _update_alert_state(self, temperature: float, forced: bool) -> bool:
+        if forced or temperature >= ALERT_THRESHOLD_TEMP_C:
+            self._alert_active = True
+        elif temperature < ALERT_CLEAR_TEMP_C:
+            self._alert_active = False
+        return self._alert_active
 
     def trigger_anomaly(self, temp_c: float = 38.5) -> datamesh_pb2.TelemetryPacket:
         """Immediately transmits a critical thermal anomaly alert packet (>35°C).
 
+        The rack then stays hot for `anomaly_hold_sec` and cools back to its base temperature.
+
         Example:
             alert = sensor.trigger_anomaly(temp_c=39.0)
         """
-        self._anomaly_base_c = temp_c
+        self._anomaly = (temp_c, self._clock())
         alert_packet = self.create_reading(temp_c=temp_c, is_alert=True)
         self.send_telemetry(alert_packet)
         logger.warning(
-            "CRITICAL ALERT SENT: Device %s reached %.1f °C",
+            "CRITICAL ALERT SENT: Device %s reached %.1f °C (hold %.0fs, then cooling)",
             self.device_id,
             alert_packet.temperature_c,
+            self.anomaly_hold_sec,
         )
         return alert_packet
 

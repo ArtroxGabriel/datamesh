@@ -4,6 +4,7 @@ import datamesh_pb2
 import pytest
 
 from sources.temperature.sensor import (
+    ALERT_CLEAR_TEMP_C,
     ALERT_THRESHOLD_TEMP_C,
     TemperatureSensor,
 )
@@ -24,9 +25,38 @@ class FakeUDPSocket:
         self.closed = True
 
 
+class FakeClock:
+    """Manually advanced monotonic clock so anomaly timing is tested without sleeping."""
+
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+    def advance(self, seconds: float) -> None:
+        self.now += seconds
+
+
 @pytest.fixture
 def fake_socket() -> FakeUDPSocket:
     return FakeUDPSocket()
+
+
+@pytest.fixture
+def anomaly_sensor(fake_socket: FakeUDPSocket) -> tuple[TemperatureSensor, FakeClock]:
+    clock = FakeClock()
+    sensor = TemperatureSensor(
+        device_id="temp-anomaly",
+        gateway_host="127.0.0.1",
+        gateway_port=9998,
+        base_temp_c=26.0,
+        socket_factory=lambda: fake_socket,
+        anomaly_hold_sec=20.0,
+        anomaly_decay_sec=10.0,
+        clock=clock,
+    )
+    return sensor, clock
 
 
 def test_creates_periodic_telemetry_packet(fake_socket: FakeUDPSocket) -> None:
@@ -261,7 +291,7 @@ def test_custom_base_temp_and_sigusr1_anomaly_trigger(fake_socket: FakeUDPSocket
     assert dispatched.is_alert is True
     assert dispatched.temperature_c >= ALERT_THRESHOLD_TEMP_C
 
-    # Subsequent periodic readings must remain in anomaly state (> 35 C) so dashboard shows alert
+    # Readings inside the hold window stay in anomaly state (> 35 C) so dashboard shows alert
     next_reading = sensor.create_reading()
     assert next_reading.is_alert is True
     assert next_reading.temperature_c >= ALERT_THRESHOLD_TEMP_C
@@ -288,3 +318,92 @@ def test_start_multicast_listener_before_start_keeps_listener_thread_alive() -> 
         assert sensor._mcast_thread.is_alive() is True
     finally:
         sensor.stop()
+
+
+def test_anomaly_stays_hot_during_hold_window(
+    anomaly_sensor: tuple[TemperatureSensor, FakeClock],
+) -> None:
+    # Arrange
+    sensor, clock = anomaly_sensor
+    sensor.trigger_anomaly(temp_c=38.8)
+
+    # Act: just before the hold window ends
+    clock.advance(19.0)
+    reading = sensor.create_reading()
+
+    # Assert
+    assert reading.is_alert is True
+    assert reading.temperature_c >= ALERT_THRESHOLD_TEMP_C
+
+
+def test_anomaly_cools_down_and_clears_alert_after_hold(
+    anomaly_sensor: tuple[TemperatureSensor, FakeClock],
+) -> None:
+    # Arrange
+    sensor, clock = anomaly_sensor
+    sensor.trigger_anomaly(temp_c=38.8)
+
+    # Act: one decay constant after the hold (excess 12.8 °C * e^-1 ≈ 4.7 °C)
+    clock.advance(30.0)
+    reading = sensor.create_reading()
+
+    # Assert: still warmer than base, but below the clear threshold, so the alert is off
+    assert 26.0 + 3.0 < reading.temperature_c < ALERT_CLEAR_TEMP_C
+    assert reading.is_alert is False
+
+
+def test_anomaly_settles_back_to_nominal_readings(
+    anomaly_sensor: tuple[TemperatureSensor, FakeClock],
+) -> None:
+    # Arrange
+    sensor, clock = anomaly_sensor
+    sensor.trigger_anomaly(temp_c=38.8)
+
+    # Act
+    clock.advance(120.0)
+    reading = sensor.create_reading()
+
+    # Assert: anomaly state is discarded and readings fall back to the base noise band
+    assert sensor._anomaly is None
+    assert 26.0 - 1.5 <= reading.temperature_c <= 26.0 + 2.5
+    assert reading.is_alert is False
+
+
+def test_alert_uses_hysteresis_near_threshold(
+    anomaly_sensor: tuple[TemperatureSensor, FakeClock],
+) -> None:
+    # Arrange
+    sensor, _ = anomaly_sensor
+
+    # Act & Assert: 34 °C keeps an active alert; only below 33 °C it clears
+    assert sensor.create_reading(temp_c=36.0).is_alert is True
+    assert sensor.create_reading(temp_c=34.0).is_alert is True
+    assert sensor.create_reading(temp_c=32.9).is_alert is False
+    assert sensor.create_reading(temp_c=34.0).is_alert is False
+
+
+def test_retrigger_during_cooling_restarts_hold_window(
+    anomaly_sensor: tuple[TemperatureSensor, FakeClock],
+) -> None:
+    # Arrange
+    sensor, clock = anomaly_sensor
+    sensor.trigger_anomaly(temp_c=38.8)
+    clock.advance(30.0)
+
+    # Act
+    sensor.trigger_anomaly(temp_c=38.8)
+    clock.advance(15.0)
+    reading = sensor.create_reading()
+
+    # Assert
+    assert reading.is_alert is True
+    assert reading.temperature_c >= ALERT_THRESHOLD_TEMP_C
+
+
+def test_temperature_main_loads_anomaly_timing(monkeypatch: pytest.MonkeyPatch) -> None:
+    from sources.temperature.main import _load_anomaly_timing
+
+    monkeypatch.setenv("ANOMALY_HOLD_SEC", "45")
+    monkeypatch.setenv("ANOMALY_DECAY_SEC", "7.5")
+
+    assert _load_anomaly_timing() == (45.0, 7.5)
