@@ -109,7 +109,7 @@ O sistema é dividido em três camadas estritamente desacopladas (**Fontes de Da
 > Fonte **orientada a eventos** em Python com telemetria periódica e disparo imediato de anomalias térmicas (`> 35 °C`).
 
 - **`sources/temperature/sensor.py`:** Permite configurar a temperatura base nominal de cada rack (`BASE_TEMP_C`) e envia leituras periódicas via UDP unicast.
-- **Disparo Imediato de Evento Crítico:** Ao receber um gatilho (via tecla `[ENTER]` no terminal ou sinal `SIGUSR1` enviado pelo console da demonstração), invoca `trigger_anomaly(temp_c=38.8)` — transmitindo **imediatamente** um pacote UDP com `is_alert=True` sem aguardar o temporizador periódico e mantendo o estado de anomalia ativa (`> 35 °C`) para visualização clara no Dashboard.
+- **Disparo Imediato de Evento Crítico:** Ao receber um gatilho (via tecla `[ENTER]` no terminal ou sinal `SIGUSR1` enviado pelo console da demonstração), invoca `trigger_anomaly(temp_c=38.8)` — transmitindo **imediatamente** um pacote UDP com `is_alert=True` sem aguardar o temporizador periódico. O rack permanece quente por um platô (`ANOMALY_HOLD_SEC`, padrão 20 s) para visualização clara no Dashboard e depois resfria exponencialmente até a temperatura base (`ANOMALY_DECAY_SEC`, padrão 10 s); o alerta só é desligado abaixo de 33 °C (histerese) para não oscilar em torno do limiar.
 
 ### 2.5. PDU de Rack em Go (`sources/pdu/`)
 >
@@ -127,6 +127,7 @@ O sistema é dividido em três camadas estritamente desacopladas (**Fontes de Da
   - Agrupa os dispositivos conectados em **3 categorias visuais** (*Climatização AC*, *Sensores Térmicos de Rack* e *PDUs de Rack*).
   - Destaca imediatamente em vermelho (`🔥 ALERTA (>35°C)`) sensores em estado de anomalia térmica e sinaliza fontes inativas (`OFFLINE (>15s)`).
   - Exibe gráficos em tempo real de séries temporais térmicas e elétricas, painel de controle gRPC do AC e execução interativa das 3 consultas analíticas.
+- **`client/events.py` & `client/static/events.html` (`/events`):** Linha do tempo de eventos com filtros por categoria — fontes registradas no Gateway, transições `ONLINE`/`OFFLINE`, início e fim de alertas térmicos (com o timestamp do próprio pacote), comandos gRPC enviados ao AC e consultas analíticas executadas. Os eventos são detectados no processo do Cliente por uma thread que consulta o Gateway via TCP a cada 1s, então o histórico cobre toda a demonstração mesmo que a página seja aberta depois.
 
 ---
 

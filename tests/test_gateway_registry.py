@@ -200,3 +200,57 @@ def test_default_timestamp_handling_when_omitted(registry: DeviceRegistry) -> No
     assert len(all_devices) == 1
     assert updated is not None and updated.last_seen_ms > 0
     assert updated.is_online is True
+
+
+def test_reannouncement_keeps_telemetry_summary_and_fills_network_info(
+    registry: DeviceRegistry,
+) -> None:
+    # Arrange: telemetry arrives first (static gateway address), so there is no IP yet
+    registry.update_from_telemetry(
+        datamesh_pb2.TelemetryPacket(
+            device_id="temp-rack-01",
+            device_type=datamesh_pb2.TEMPERATURE_SENSOR,
+            timestamp_ms=5_000,
+            temperature_c=38.8,
+            is_alert=True,
+        )
+    )
+
+    # Act: the periodic discovery beacon triggers a re-announcement
+    registry.register_device(
+        datamesh_pb2.DeviceInfo(
+            device_id="temp-rack-01",
+            device_type=datamesh_pb2.TEMPERATURE_SENSOR,
+            ip="10.0.0.7",
+            state_summary="Online | Base temp ~26.0 °C",
+            last_seen_ms=6_000,
+        )
+    )
+    device = registry.get_device("temp-rack-01", current_time_ms=6_000)
+
+    # Assert: live alert text survives, network identity and liveness are updated
+    assert device is not None
+    assert "[ALERTA]" in device.state_summary
+    assert device.ip == "10.0.0.7"
+    assert device.last_seen_ms == 6_000
+
+
+def test_announcement_summary_used_until_first_telemetry(registry: DeviceRegistry) -> None:
+    # Arrange
+    registry.register_device(datamesh_pb2.DeviceInfo(device_id="pdu-rack-01", last_seen_ms=1_000))
+
+    # Act
+    registry.register_device(
+        datamesh_pb2.DeviceInfo(
+            device_id="pdu-rack-01",
+            device_type=datamesh_pb2.RACK_PDU,
+            state_summary="Online | Nominal Power: 1400 W",
+            last_seen_ms=2_000,
+        )
+    )
+    device = registry.get_device("pdu-rack-01", current_time_ms=2_000)
+
+    # Assert
+    assert device is not None
+    assert device.state_summary == "Online | Nominal Power: 1400 W"
+    assert device.device_type == datamesh_pb2.RACK_PDU

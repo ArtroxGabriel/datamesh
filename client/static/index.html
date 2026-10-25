@@ -101,6 +101,14 @@
       background-color: #ffffff;
       border-radius: 50%;
     }
+    .nav-link {
+      color: var(--primary);
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-decoration: none;
+      line-height: 28px;
+    }
+    .nav-link:hover { text-decoration: underline; }
     .clock-display {
       font-size: 0.85rem;
       color: var(--text-muted);
@@ -407,6 +415,7 @@
         </div>
       </div>
       <div class="header-right">
+        <a class="nav-link" href="/events">Linha do tempo de eventos →</a>
         <div class="status-badge-gateway" id="gatewayStatus">GATEWAY TCP ONLINE</div>
         <div class="clock-display" id="timeClock">--:--:--</div>
       </div>
@@ -432,7 +441,7 @@
     </div>
     <div class="card">
       <div class="card-title-row">
-        <span class="card-title">Telemetria Elétrica da PDU (Potência & Tensão)</span>
+        <span class="card-title">Telemetria Elétrica da PDU (Potência)</span>
         <span class="tag-continuous">CONTINUOUS UDP</span>
       </div>
       <div class="chart-container">
@@ -511,6 +520,23 @@
     let thermalChart = null;
     let powerChart = null;
 
+    // History is shared by all devices, so the row limit must cover the whole window
+    // (~1.6 packets/s with the 5 demo sources) and grow with sources added live.
+    const HISTORY_WINDOW_MS = 120000;
+    const HISTORY_LIMIT = 400;
+    const ALERT_THRESHOLD_C = 35.0;
+    // Longer than a couple of missed packets (sources send every 2-5s), so only real outages
+    // break the line instead of Chart.js bridging the downtime with a straight segment.
+    const GAP_THRESHOLD_MS = 10000;
+    // Categorical slots validated for CVD on the white card surface; red stays reserved for alerts.
+    const SERIES_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6'];
+    const OVERFLOW_COLOR = '#94a3b8';
+    const ALERT_COLOR = '#dc2626';
+    const REFERENCE_COLOR = '#64748b';
+    // Per-chart maps so a device keeps its color when others join or leave.
+    const thermalColors = new Map();
+    const powerColors = new Map();
+
     function notify(text, isError) {
       const box = document.getElementById("toastBar");
       box.innerText = text;
@@ -580,97 +606,49 @@
       }
     }
 
-    function initCharts() {
-      const tCtx = document.getElementById("thermalChart").getContext("2d");
-      thermalChart = new Chart(tCtx, {
-        type: 'line',
-        data: {
-          labels: [],
-          datasets: [
-            {
-              label: 'Sensor de Rack (°C)',
-              borderColor: '#38bdf8',
-              backgroundColor: 'rgba(56, 189, 248, 0.15)',
-              data: [],
-              borderWidth: 2,
-              pointRadius: 2,
-              tension: 0.1,
-              fill: false
-            },
-            {
-              label: 'AC Setpoint Alvo (°C)',
-              borderColor: '#f59e0b',
-              borderDash: [5, 5],
-              data: [],
-              borderWidth: 2,
-              pointRadius: 0
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            y: {
-              grid: { color: '#e2e8f0' },
-              ticks: { color: '#64748b' },
-              min: 0,
-              suggestedMax: 40
-            },
-            x: {
-              grid: { color: '#f1f5f9' },
-              ticks: { color: '#64748b' }
-            }
-          },
-          plugins: {
-            legend: {
-              position: 'top',
-              labels: { boxWidth: 16, color: '#0f172a' }
-            }
-          }
-        }
-      });
+    function formatClock(ms) {
+      return new Date(ms).toLocaleTimeString();
+    }
 
-      const pCtx = document.getElementById("powerChart").getContext("2d");
-      powerChart = new Chart(pCtx, {
-        type: 'line',
-        data: {
-          labels: [],
-          datasets: [
-            {
-              label: 'Potência PDU (Watts)',
-              borderColor: '#10b981',
-              backgroundColor: 'rgba(16, 185, 129, 0.15)',
-              data: [],
-              borderWidth: 2,
-              pointRadius: 2,
-              fill: true,
-              tension: 0.1
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            y: {
-              grid: { color: '#e2e8f0' },
-              ticks: { color: '#64748b' },
-              min: 0,
-              suggestedMax: 2000
-            },
-            x: {
-              grid: { color: '#f1f5f9' },
-              ticks: { color: '#64748b' }
-            }
+    function chartOptions(yScale, unit) {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        interaction: { mode: 'nearest', axis: 'x', intersect: false },
+        scales: {
+          // Numeric time axis: points are spaced by real timestamps, not by arrival order.
+          x: {
+            type: 'linear',
+            grid: { color: '#f1f5f9' },
+            ticks: { color: '#64748b', stepSize: 30000, includeBounds: false, callback: formatClock }
           },
-          plugins: {
-            legend: {
-              position: 'top',
-              labels: { boxWidth: 16, color: '#0f172a' }
+          y: { ...yScale, grid: { color: '#e2e8f0' }, ticks: { color: '#64748b' } }
+        },
+        plugins: {
+          // Thin swatches so dashed reference lines read as lines, not filled boxes.
+          legend: { position: 'top', labels: { boxWidth: 18, boxHeight: 2, color: '#0f172a' } },
+          tooltip: {
+            filter: item => !item.dataset.reference,
+            callbacks: {
+              title: items => (items.length ? formatClock(items[0].parsed.x) : ''),
+              label: item => `${item.dataset.label}: ${item.parsed.y.toFixed(1)} ${unit}`
             }
           }
         }
+      };
+    }
+
+    function initCharts() {
+      thermalChart = new Chart(document.getElementById("thermalChart"), {
+        type: 'line',
+        data: { datasets: [] },
+        options: chartOptions({ min: 15, suggestedMax: 40 }, '°C')
+      });
+      powerChart = new Chart(document.getElementById("powerChart"), {
+        type: 'line',
+        data: { datasets: [] },
+        options: chartOptions({ min: 0, suggestedMax: 2000 }, 'W')
       });
     }
 
@@ -679,7 +657,7 @@
       try {
         const [devResp, histResp] = await Promise.all([
           fetch("/api/devices"),
-          fetch("/api/telemetry/history?limit=60")
+          fetch(`/api/telemetry/history?limit=${HISTORY_LIMIT}`)
         ]);
 
         if (devResp.ok) {
@@ -759,34 +737,129 @@
         renderGroupSection("⚡ Distribuição de Energia — PDUs de Rack (Go UDP)", pduDevs);
     }
 
+    function colorFor(colorMap, deviceId) {
+      if (!colorMap.has(deviceId)) {
+        const slot = colorMap.size;
+        colorMap.set(deviceId, slot < SERIES_COLORS.length ? SERIES_COLORS[slot] : OVERFLOW_COLOR);
+      }
+      return colorMap.get(deviceId);
+    }
+
+    function groupByDevice(rows, toPoint) {
+      const groups = new Map();
+      for (const row of rows) {
+        if (!groups.has(row.device_id)) groups.set(row.device_id, []);
+        groups.get(row.device_id).push(toPoint(row));
+      }
+      return [...groups.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([id, points]) => [id, withGaps(points)]);
+    }
+
+    function withGaps(points) {
+      const result = [];
+      for (const point of points) {
+        const prev = result[result.length - 1];
+        if (prev && point.x - prev.x > GAP_THRESHOLD_MS) {
+          result.push({ x: prev.x + 1, y: null });
+        }
+        result.push(point);
+      }
+      return result;
+    }
+
+    function deviceSeries(deviceId, points, color) {
+      return {
+        label: deviceId,
+        data: points,
+        borderColor: color,
+        backgroundColor: color,
+        borderWidth: 2,
+        tension: 0.2,
+        pointRadius: ctx => (ctx.raw && ctx.raw.alert ? 5 : 0),
+        pointHoverRadius: 4,
+        pointBackgroundColor: ctx => (ctx.raw && ctx.raw.alert ? ALERT_COLOR : color),
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 2
+      };
+    }
+
+    function setpointSeries(deviceId, points) {
+      // Null while the AC is off, so the line breaks instead of showing a setpoint nobody applies.
+      return {
+        label: `Setpoint ${deviceId}`,
+        data: points,
+        stepped: true,
+        borderColor: REFERENCE_COLOR,
+        backgroundColor: REFERENCE_COLOR,
+        borderDash: [5, 5],
+        borderWidth: 1.5,
+        pointRadius: 0
+      };
+    }
+
+    function thresholdSeries(xMin, xMax) {
+      return {
+        label: `Limiar de alerta (${ALERT_THRESHOLD_C.toFixed(0)} °C)`,
+        reference: true,
+        data: [{ x: xMin, y: ALERT_THRESHOLD_C }, { x: xMax, y: ALERT_THRESHOLD_C }],
+        borderColor: ALERT_COLOR,
+        backgroundColor: ALERT_COLOR,
+        borderDash: [6, 4],
+        borderWidth: 1.5,
+        pointRadius: 0,
+        pointHoverRadius: 0
+      };
+    }
+
+    function applyDatasets(chart, datasets, xMin, xMax) {
+      // Datasets are rebuilt every poll; carry over legend toggles so hidden series stay hidden.
+      const hidden = new Set(
+        chart.data.datasets.filter((_, i) => !chart.isDatasetVisible(i)).map(d => d.label)
+      );
+      datasets.forEach(d => { d.hidden = hidden.has(d.label); });
+      chart.data.datasets = datasets;
+      chart.options.scales.x.min = xMin;
+      chart.options.scales.x.max = xMax;
+      chart.update('none');
+    }
+
+    function renderThermalChart(rows, xMin, xMax) {
+      const sensors = groupByDevice(
+        rows.filter(h => h.device_type === "TEMPERATURE_SENSOR"),
+        h => ({ x: h.timestamp_ms, y: h.temperature_c, alert: h.is_alert })
+      );
+      const setpoints = groupByDevice(
+        rows.filter(h => h.device_type === "AIR_CONDITIONER"),
+        h => ({ x: h.timestamp_ms, y: h.ac_power_on ? h.target_temp_c : null })
+      );
+      applyDatasets(thermalChart, [
+        ...sensors.map(([id, pts]) => deviceSeries(id, pts, colorFor(thermalColors, id))),
+        ...setpoints.map(([id, pts]) => setpointSeries(id, pts)),
+        thresholdSeries(xMin, xMax)
+      ], xMin, xMax);
+    }
+
+    function renderPowerChart(rows, xMin, xMax) {
+      const pdus = groupByDevice(
+        rows.filter(h => h.device_type === "RACK_PDU"),
+        h => ({ x: h.timestamp_ms, y: h.power_watts })
+      );
+      applyDatasets(
+        powerChart,
+        pdus.map(([id, pts]) => deviceSeries(id, pts, colorFor(powerColors, id))),
+        xMin,
+        xMax
+      );
+    }
+
     function renderHistory(hist) {
-      if (!hist || hist.length === 0) return;
-      const sorted = [...hist].reverse();
-
-      const thermalRows = sorted.filter(h => h.temperature_c > 0);
-      thermalChart.data.labels = thermalRows.map(
-        h => `${h.device_id} (${new Date(h.timestamp_ms).toLocaleTimeString()})`
-      );
-      thermalChart.data.datasets[0].data = thermalRows.map(h => h.temperature_c);
-      thermalChart.data.datasets[0].pointBackgroundColor = thermalRows.map(
-        h => (h.is_alert || h.temperature_c >= 35.0) ? '#dc2626' : '#38bdf8'
-      );
-      thermalChart.data.datasets[0].pointRadius = thermalRows.map(
-        h => (h.is_alert || h.temperature_c >= 35.0) ? 5 : 2
-      );
-      let lastSetpoint = 21.0;
-      thermalChart.data.datasets[1].data = thermalRows.map(h => {
-        if (h.target_temp_c > 0) lastSetpoint = h.target_temp_c;
-        return lastSetpoint;
-      });
-      thermalChart.update('none');
-
-      const powerRows = sorted.filter(h => h.power_watts > 0 && h.device_type === "RACK_PDU");
-      powerChart.data.labels = powerRows.map(
-        h => `${h.device_id} (${new Date(h.timestamp_ms).toLocaleTimeString()})`
-      );
-      powerChart.data.datasets[0].data = powerRows.map(h => h.power_watts);
-      powerChart.update('none');
+      // The Gateway already returns rows oldest-first; just keep the visible window.
+      const xMax = Date.now();
+      const xMin = xMax - HISTORY_WINDOW_MS;
+      const rows = (hist || []).filter(h => h.timestamp_ms >= xMin);
+      renderThermalChart(rows, xMin, xMax);
+      renderPowerChart(rows, xMin, xMax);
     }
 
     window.addEventListener("DOMContentLoaded", () => {

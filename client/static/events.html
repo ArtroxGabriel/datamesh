@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DataMesh Eventos</title>
+  <style>
+    :root {
+      --bg: #edf2f7;
+      --card-bg: #ffffff;
+      --border: #d1d9e6;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --primary: #0066cc;
+      --green: #0a8754;
+      --green-bg: #dcfce7;
+      --red: #dc2626;
+      --red-bg: #fee2e2;
+      --amber-text: #b45309;
+      --amber-bg: #fef3c7;
+      --info-bg: #e0f2fe;
+      --info-text: #075985;
+      --highlight: #fef9c3;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding: 1.25rem 2rem 2.5rem 2rem;
+      line-height: 1.4;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.25rem;
+    }
+    .brand { display: flex; align-items: flex-start; gap: 0.75rem; }
+    .badge-dcim {
+      background-color: #0b2545;
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 0.95rem;
+      padding: 0.35rem 0.65rem;
+      border-radius: 6px;
+      letter-spacing: 0.05em;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+    }
+    .brand-title { font-size: 1.25rem; font-weight: 700; line-height: 28px; }
+    .brand-subtitle { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem; }
+    .nav-link {
+      color: var(--primary);
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-decoration: none;
+      line-height: 28px;
+    }
+    .nav-link:hover { text-decoration: underline; }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+    }
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .filters { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .filter-btn {
+      border: 1px solid var(--border);
+      background: #f8fafc;
+      color: var(--text-main);
+      border-radius: 20px;
+      padding: 0.35rem 0.8rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .filter-btn.active { background: var(--primary); border-color: var(--primary); color: #ffffff; }
+    .filter-count { opacity: 0.75; margin-left: 0.25rem; }
+    .live-status { font-size: 0.8rem; color: var(--text-muted); }
+    .event-list { list-style: none; }
+    .event-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.85rem;
+      padding: 0.65rem 0.5rem;
+      border-bottom: 1px solid #eef2f7;
+      flex-wrap: wrap;
+      /* Shorter than the poll interval: rows are rebuilt on every poll. */
+      transition: background-color 1.2s ease-out;
+    }
+    .event-row:last-child { border-bottom: none; }
+    .event-row.is-new { background-color: var(--highlight); transition: none; }
+    .event-time {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      min-width: 5.5rem;
+      padding-top: 0.1rem;
+    }
+    .severity {
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      border-radius: 4px;
+      padding: 0.2rem 0.5rem;
+      min-width: 6.5rem;
+      text-align: center;
+    }
+    .severity-critical { background: var(--red-bg); color: var(--red); }
+    .severity-warning { background: var(--amber-bg); color: var(--amber-text); }
+    .severity-success { background: var(--green-bg); color: var(--green); }
+    .severity-info { background: var(--info-bg); color: var(--info-text); }
+    .event-body { flex: 1; min-width: 14rem; }
+    .event-device {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-weight: 700;
+      font-size: 0.88rem;
+    }
+    .event-category { font-size: 0.75rem; color: var(--text-muted); margin-left: 0.4rem; }
+    .event-message { font-size: 0.9rem; margin-top: 0.15rem; }
+    .empty-state { color: var(--text-muted); font-size: 0.9rem; padding: 1rem 0.5rem; }
+    @media (max-width: 640px) {
+      body { padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="badge-dcim">DCIM</div>
+      <div>
+        <h1 class="brand-title">Linha do Tempo de Eventos</h1>
+        <p class="brand-subtitle">Conectividade, alertas térmicos, atuações gRPC e consultas analíticas</p>
+      </div>
+    </div>
+    <a class="nav-link" href="/">← Voltar ao Dashboard</a>
+  </header>
+
+  <div class="card">
+    <div class="toolbar">
+      <div class="filters" id="filters"></div>
+      <span class="live-status" id="liveStatus">Conectando...</span>
+    </div>
+    <ul class="event-list" id="eventList"></ul>
+  </div>
+
+  <script>
+    const POLL_INTERVAL_MS = 1500;
+    const EVENT_LIMIT = 300;
+    const FILTERS = [
+      { key: "all", label: "Todos" },
+      { key: "connectivity", label: "📡 Conectividade" },
+      { key: "alert", label: "🌡️ Alertas" },
+      { key: "actuation", label: "❄️ Atuação gRPC" },
+      { key: "analytics", label: "📊 Consultas" }
+    ];
+    const CATEGORY_LABELS = {
+      connectivity: "conectividade",
+      alert: "alerta térmico",
+      actuation: "atuação gRPC",
+      analytics: "consulta analítica"
+    };
+    // Icon + text so severity is never conveyed by color alone.
+    const SEVERITY_LABELS = {
+      critical: "⛔ CRÍTICO",
+      warning: "⚠️ ATENÇÃO",
+      success: "✅ NORMALIZADO",
+      info: "ℹ️ INFO"
+    };
+
+    let activeFilter = "all";
+    let latestEvents = [];
+    const seenKeys = new Set();
+    let firstLoad = true;
+
+    function eventKey(e) {
+      return `${e.timestamp_ms}|${e.device_id}|${e.message}`;
+    }
+
+    function el(tag, className, text) {
+      // textContent only: device ids and messages originate from unauthenticated UDP packets.
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+
+    function renderFilters() {
+      const container = document.getElementById("filters");
+      container.replaceChildren(...FILTERS.map(f => {
+        const count = f.key === "all"
+          ? latestEvents.length
+          : latestEvents.filter(e => e.category === f.key).length;
+        const btn = el("button", "filter-btn" + (f.key === activeFilter ? " active" : ""), f.label);
+        btn.appendChild(el("span", "filter-count", `(${count})`));
+        btn.addEventListener("click", () => { activeFilter = f.key; render(); });
+        return btn;
+      }));
+    }
+
+    function renderRow(e) {
+      const row = el("li", "event-row");
+      const key = eventKey(e);
+      if (!firstLoad && !seenKeys.has(key)) {
+        row.classList.add("is-new");
+        requestAnimationFrame(() => requestAnimationFrame(() => row.classList.remove("is-new")));
+      }
+      seenKeys.add(key);
+      row.appendChild(el("span", "event-time", new Date(e.timestamp_ms).toLocaleTimeString()));
+      row.appendChild(el("span", `severity severity-${e.severity}`, SEVERITY_LABELS[e.severity] || e.severity));
+      const body = el("div", "event-body");
+      const head = el("div");
+      head.appendChild(el("span", "event-device", e.device_id));
+      head.appendChild(el("span", "event-category", CATEGORY_LABELS[e.category] || e.category));
+      body.appendChild(head);
+      body.appendChild(el("div", "event-message", e.message));
+      row.appendChild(body);
+      return row;
+    }
+
+    function render() {
+      renderFilters();
+      const visible = activeFilter === "all"
+        ? latestEvents
+        : latestEvents.filter(e => e.category === activeFilter);
+      const list = document.getElementById("eventList");
+      if (visible.length === 0) {
+        list.replaceChildren(el("li", "empty-state", "Nenhum evento registrado ainda."));
+        return;
+      }
+      list.replaceChildren(...visible.map(renderRow));
+    }
+
+    async function poll() {
+      const status = document.getElementById("liveStatus");
+      try {
+        const resp = await fetch(`/api/events?limit=${EVENT_LIMIT}`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        latestEvents = await resp.json();
+        render();
+        firstLoad = false;
+        status.textContent = `Atualizado às ${new Date().toLocaleTimeString()}`;
+      } catch (err) {
+        status.textContent = "Cliente Web inacessível — tentando novamente...";
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      poll();
+      setInterval(poll, POLL_INTERVAL_MS);
+    });
+  </script>
+</body>
+</html>

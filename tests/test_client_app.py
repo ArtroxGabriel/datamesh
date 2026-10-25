@@ -250,3 +250,30 @@ def test_serve_dashboard_returns_html(test_client: TestClient) -> None:
     assert resp.status_code == 200
     assert "DataMesh" in resp.text
     assert "text/html" in resp.headers["content-type"]
+
+
+def test_events_page_and_api_list_recorded_actions(
+    test_client: TestClient, fake_gateway: FakeGatewayClient
+) -> None:
+    # Arrange: an AC command and an analytics query go through the client endpoints
+    test_client.post(
+        "/api/ac/control",
+        json={
+            "device_id": "ac-rack-01",
+            "power_on": True,
+            "target_temp_c": 19.0,
+            "fan_speed_pct": 80,
+        },
+    )
+    test_client.get("/api/analytics/hottest_rack")
+
+    # Act
+    page = test_client.get("/events")
+    resp = test_client.get("/api/events?limit=10")
+
+    # Assert
+    assert page.status_code == 200
+    assert "Linha do Tempo" in page.text
+    assert resp.status_code == 200
+    categories = {e["category"] for e in resp.json()}
+    assert categories == {"actuation", "analytics"}

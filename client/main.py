@@ -6,6 +6,7 @@ import os
 import uvicorn
 
 from client.app import create_app
+from client.events import EventTimeline, TimelinePoller
 from client.gateway_client import TCPGatewayClient
 
 logging.basicConfig(
@@ -27,7 +28,10 @@ def main() -> None:
     web_host, web_port, gw_host, gw_port = _load_config()
     logger.info("Connecting to DataMesh Gateway at TCP %s:%d", gw_host, gw_port)
     client = TCPGatewayClient(host=gw_host, port=gw_port)
-    app = create_app(gateway_client=client)
+    timeline = EventTimeline()
+    # Started here rather than in create_app so tests can build the app without a polling thread.
+    TimelinePoller(client, timeline).start()
+    app = create_app(gateway_client=client, timeline=timeline)
 
     logger.info("Starting Web Dashboard on http://%s:%d", web_host, web_port)
     uvicorn.run(app, host=web_host, port=web_port)
