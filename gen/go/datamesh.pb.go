@@ -326,27 +326,223 @@ func (x *DeviceInfo) GetLastSeenMs() int64 {
 	return 0
 }
 
+// Sub-messages for specific source telemetry payloads (oneof)
+type TemperatureTelemetry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TemperatureC  float64                `protobuf:"fixed64,1,opt,name=temperature_c,json=temperatureC,proto3" json:"temperature_c,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TemperatureTelemetry) Reset() {
+	*x = TemperatureTelemetry{}
+	mi := &file_datamesh_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TemperatureTelemetry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TemperatureTelemetry) ProtoMessage() {}
+
+func (x *TemperatureTelemetry) ProtoReflect() protoreflect.Message {
+	mi := &file_datamesh_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TemperatureTelemetry.ProtoReflect.Descriptor instead.
+func (*TemperatureTelemetry) Descriptor() ([]byte, []int) {
+	return file_datamesh_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *TemperatureTelemetry) GetTemperatureC() float64 {
+	if x != nil {
+		return x.TemperatureC
+	}
+	return 0
+}
+
+type ACTelemetry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TemperatureC  float64                `protobuf:"fixed64,1,opt,name=temperature_c,json=temperatureC,proto3" json:"temperature_c,omitempty"`
+	TargetTempC   float64                `protobuf:"fixed64,2,opt,name=target_temp_c,json=targetTempC,proto3" json:"target_temp_c,omitempty"`
+	FanSpeedPct   int32                  `protobuf:"varint,3,opt,name=fan_speed_pct,json=fanSpeedPct,proto3" json:"fan_speed_pct,omitempty"`
+	PowerWatts    float64                `protobuf:"fixed64,4,opt,name=power_watts,json=powerWatts,proto3" json:"power_watts,omitempty"`
+	CurrentAmps   float64                `protobuf:"fixed64,5,opt,name=current_amps,json=currentAmps,proto3" json:"current_amps,omitempty"`
+	VoltageVolts  float64                `protobuf:"fixed64,6,opt,name=voltage_volts,json=voltageVolts,proto3" json:"voltage_volts,omitempty"`
+	AcPowerOn     bool                   `protobuf:"varint,7,opt,name=ac_power_on,json=acPowerOn,proto3" json:"ac_power_on,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ACTelemetry) Reset() {
+	*x = ACTelemetry{}
+	mi := &file_datamesh_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ACTelemetry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ACTelemetry) ProtoMessage() {}
+
+func (x *ACTelemetry) ProtoReflect() protoreflect.Message {
+	mi := &file_datamesh_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ACTelemetry.ProtoReflect.Descriptor instead.
+func (*ACTelemetry) Descriptor() ([]byte, []int) {
+	return file_datamesh_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ACTelemetry) GetTemperatureC() float64 {
+	if x != nil {
+		return x.TemperatureC
+	}
+	return 0
+}
+
+func (x *ACTelemetry) GetTargetTempC() float64 {
+	if x != nil {
+		return x.TargetTempC
+	}
+	return 0
+}
+
+func (x *ACTelemetry) GetFanSpeedPct() int32 {
+	if x != nil {
+		return x.FanSpeedPct
+	}
+	return 0
+}
+
+func (x *ACTelemetry) GetPowerWatts() float64 {
+	if x != nil {
+		return x.PowerWatts
+	}
+	return 0
+}
+
+func (x *ACTelemetry) GetCurrentAmps() float64 {
+	if x != nil {
+		return x.CurrentAmps
+	}
+	return 0
+}
+
+func (x *ACTelemetry) GetVoltageVolts() float64 {
+	if x != nil {
+		return x.VoltageVolts
+	}
+	return 0
+}
+
+func (x *ACTelemetry) GetAcPowerOn() bool {
+	if x != nil {
+		return x.AcPowerOn
+	}
+	return false
+}
+
+type PDUTelemetry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PowerWatts    float64                `protobuf:"fixed64,1,opt,name=power_watts,json=powerWatts,proto3" json:"power_watts,omitempty"`
+	CurrentAmps   float64                `protobuf:"fixed64,2,opt,name=current_amps,json=currentAmps,proto3" json:"current_amps,omitempty"`
+	VoltageVolts  float64                `protobuf:"fixed64,3,opt,name=voltage_volts,json=voltageVolts,proto3" json:"voltage_volts,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PDUTelemetry) Reset() {
+	*x = PDUTelemetry{}
+	mi := &file_datamesh_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PDUTelemetry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PDUTelemetry) ProtoMessage() {}
+
+func (x *PDUTelemetry) ProtoReflect() protoreflect.Message {
+	mi := &file_datamesh_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PDUTelemetry.ProtoReflect.Descriptor instead.
+func (*PDUTelemetry) Descriptor() ([]byte, []int) {
+	return file_datamesh_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *PDUTelemetry) GetPowerWatts() float64 {
+	if x != nil {
+		return x.PowerWatts
+	}
+	return 0
+}
+
+func (x *PDUTelemetry) GetCurrentAmps() float64 {
+	if x != nil {
+		return x.CurrentAmps
+	}
+	return 0
+}
+
+func (x *PDUTelemetry) GetVoltageVolts() float64 {
+	if x != nil {
+		return x.VoltageVolts
+	}
+	return 0
+}
+
 // Continuous telemetry and immediate threshold alerts sent over UDP to Gateway
 type TelemetryPacket struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	DeviceId      string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
-	DeviceType    DeviceType             `protobuf:"varint,2,opt,name=device_type,json=deviceType,proto3,enum=datamesh.DeviceType" json:"device_type,omitempty"`
-	TimestampMs   int64                  `protobuf:"varint,3,opt,name=timestamp_ms,json=timestampMs,proto3" json:"timestamp_ms,omitempty"`
-	IsAlert       bool                   `protobuf:"varint,4,opt,name=is_alert,json=isAlert,proto3" json:"is_alert,omitempty"`
-	TemperatureC  float64                `protobuf:"fixed64,5,opt,name=temperature_c,json=temperatureC,proto3" json:"temperature_c,omitempty"`
-	TargetTempC   float64                `protobuf:"fixed64,6,opt,name=target_temp_c,json=targetTempC,proto3" json:"target_temp_c,omitempty"`
-	FanSpeedPct   int32                  `protobuf:"varint,7,opt,name=fan_speed_pct,json=fanSpeedPct,proto3" json:"fan_speed_pct,omitempty"`
-	PowerWatts    float64                `protobuf:"fixed64,8,opt,name=power_watts,json=powerWatts,proto3" json:"power_watts,omitempty"`
-	CurrentAmps   float64                `protobuf:"fixed64,9,opt,name=current_amps,json=currentAmps,proto3" json:"current_amps,omitempty"`
-	VoltageVolts  float64                `protobuf:"fixed64,10,opt,name=voltage_volts,json=voltageVolts,proto3" json:"voltage_volts,omitempty"`
-	AcPowerOn     bool                   `protobuf:"varint,11,opt,name=ac_power_on,json=acPowerOn,proto3" json:"ac_power_on,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	DeviceId    string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	DeviceType  DeviceType             `protobuf:"varint,2,opt,name=device_type,json=deviceType,proto3,enum=datamesh.DeviceType" json:"device_type,omitempty"`
+	TimestampMs int64                  `protobuf:"varint,3,opt,name=timestamp_ms,json=timestampMs,proto3" json:"timestamp_ms,omitempty"`
+	IsAlert     bool                   `protobuf:"varint,4,opt,name=is_alert,json=isAlert,proto3" json:"is_alert,omitempty"`
+	// Types that are valid to be assigned to Payload:
+	//
+	//	*TelemetryPacket_Temperature
+	//	*TelemetryPacket_Ac
+	//	*TelemetryPacket_Pdu
+	Payload       isTelemetryPacket_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *TelemetryPacket) Reset() {
 	*x = TelemetryPacket{}
-	mi := &file_datamesh_proto_msgTypes[2]
+	mi := &file_datamesh_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -358,7 +554,7 @@ func (x *TelemetryPacket) String() string {
 func (*TelemetryPacket) ProtoMessage() {}
 
 func (x *TelemetryPacket) ProtoReflect() protoreflect.Message {
-	mi := &file_datamesh_proto_msgTypes[2]
+	mi := &file_datamesh_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -371,7 +567,7 @@ func (x *TelemetryPacket) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TelemetryPacket.ProtoReflect.Descriptor instead.
 func (*TelemetryPacket) Descriptor() ([]byte, []int) {
-	return file_datamesh_proto_rawDescGZIP(), []int{2}
+	return file_datamesh_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *TelemetryPacket) GetDeviceId() string {
@@ -402,54 +598,61 @@ func (x *TelemetryPacket) GetIsAlert() bool {
 	return false
 }
 
-func (x *TelemetryPacket) GetTemperatureC() float64 {
+func (x *TelemetryPacket) GetPayload() isTelemetryPacket_Payload {
 	if x != nil {
-		return x.TemperatureC
+		return x.Payload
 	}
-	return 0
+	return nil
 }
 
-func (x *TelemetryPacket) GetTargetTempC() float64 {
+func (x *TelemetryPacket) GetTemperature() *TemperatureTelemetry {
 	if x != nil {
-		return x.TargetTempC
+		if x, ok := x.Payload.(*TelemetryPacket_Temperature); ok {
+			return x.Temperature
+		}
 	}
-	return 0
+	return nil
 }
 
-func (x *TelemetryPacket) GetFanSpeedPct() int32 {
+func (x *TelemetryPacket) GetAc() *ACTelemetry {
 	if x != nil {
-		return x.FanSpeedPct
+		if x, ok := x.Payload.(*TelemetryPacket_Ac); ok {
+			return x.Ac
+		}
 	}
-	return 0
+	return nil
 }
 
-func (x *TelemetryPacket) GetPowerWatts() float64 {
+func (x *TelemetryPacket) GetPdu() *PDUTelemetry {
 	if x != nil {
-		return x.PowerWatts
+		if x, ok := x.Payload.(*TelemetryPacket_Pdu); ok {
+			return x.Pdu
+		}
 	}
-	return 0
+	return nil
 }
 
-func (x *TelemetryPacket) GetCurrentAmps() float64 {
-	if x != nil {
-		return x.CurrentAmps
-	}
-	return 0
+type isTelemetryPacket_Payload interface {
+	isTelemetryPacket_Payload()
 }
 
-func (x *TelemetryPacket) GetVoltageVolts() float64 {
-	if x != nil {
-		return x.VoltageVolts
-	}
-	return 0
+type TelemetryPacket_Temperature struct {
+	Temperature *TemperatureTelemetry `protobuf:"bytes,5,opt,name=temperature,proto3,oneof"`
 }
 
-func (x *TelemetryPacket) GetAcPowerOn() bool {
-	if x != nil {
-		return x.AcPowerOn
-	}
-	return false
+type TelemetryPacket_Ac struct {
+	Ac *ACTelemetry `protobuf:"bytes,6,opt,name=ac,proto3,oneof"`
 }
+
+type TelemetryPacket_Pdu struct {
+	Pdu *PDUTelemetry `protobuf:"bytes,7,opt,name=pdu,proto3,oneof"`
+}
+
+func (*TelemetryPacket_Temperature) isTelemetryPacket_Payload() {}
+
+func (*TelemetryPacket_Ac) isTelemetryPacket_Payload() {}
+
+func (*TelemetryPacket_Pdu) isTelemetryPacket_Payload() {}
 
 // gRPC control payload for Precision Air Conditioner
 type ACControlRequest struct {
@@ -464,7 +667,7 @@ type ACControlRequest struct {
 
 func (x *ACControlRequest) Reset() {
 	*x = ACControlRequest{}
-	mi := &file_datamesh_proto_msgTypes[3]
+	mi := &file_datamesh_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -476,7 +679,7 @@ func (x *ACControlRequest) String() string {
 func (*ACControlRequest) ProtoMessage() {}
 
 func (x *ACControlRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_datamesh_proto_msgTypes[3]
+	mi := &file_datamesh_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -489,7 +692,7 @@ func (x *ACControlRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ACControlRequest.ProtoReflect.Descriptor instead.
 func (*ACControlRequest) Descriptor() ([]byte, []int) {
-	return file_datamesh_proto_rawDescGZIP(), []int{3}
+	return file_datamesh_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ACControlRequest) GetDeviceId() string {
@@ -531,7 +734,7 @@ type ACControlResponse struct {
 
 func (x *ACControlResponse) Reset() {
 	*x = ACControlResponse{}
-	mi := &file_datamesh_proto_msgTypes[4]
+	mi := &file_datamesh_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -543,7 +746,7 @@ func (x *ACControlResponse) String() string {
 func (*ACControlResponse) ProtoMessage() {}
 
 func (x *ACControlResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_datamesh_proto_msgTypes[4]
+	mi := &file_datamesh_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -556,7 +759,7 @@ func (x *ACControlResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ACControlResponse.ProtoReflect.Descriptor instead.
 func (*ACControlResponse) Descriptor() ([]byte, []int) {
-	return file_datamesh_proto_rawDescGZIP(), []int{4}
+	return file_datamesh_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ACControlResponse) GetSuccess() bool {
@@ -595,7 +798,7 @@ type AnalyticsResult struct {
 
 func (x *AnalyticsResult) Reset() {
 	*x = AnalyticsResult{}
-	mi := &file_datamesh_proto_msgTypes[5]
+	mi := &file_datamesh_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -607,7 +810,7 @@ func (x *AnalyticsResult) String() string {
 func (*AnalyticsResult) ProtoMessage() {}
 
 func (x *AnalyticsResult) ProtoReflect() protoreflect.Message {
-	mi := &file_datamesh_proto_msgTypes[5]
+	mi := &file_datamesh_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -620,7 +823,7 @@ func (x *AnalyticsResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AnalyticsResult.ProtoReflect.Descriptor instead.
 func (*AnalyticsResult) Descriptor() ([]byte, []int) {
-	return file_datamesh_proto_rawDescGZIP(), []int{5}
+	return file_datamesh_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *AnalyticsResult) GetQueryType() AnalyticsQueryType {
@@ -686,7 +889,7 @@ type ClientRequest struct {
 
 func (x *ClientRequest) Reset() {
 	*x = ClientRequest{}
-	mi := &file_datamesh_proto_msgTypes[6]
+	mi := &file_datamesh_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -698,7 +901,7 @@ func (x *ClientRequest) String() string {
 func (*ClientRequest) ProtoMessage() {}
 
 func (x *ClientRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_datamesh_proto_msgTypes[6]
+	mi := &file_datamesh_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -711,7 +914,7 @@ func (x *ClientRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClientRequest.ProtoReflect.Descriptor instead.
 func (*ClientRequest) Descriptor() ([]byte, []int) {
-	return file_datamesh_proto_rawDescGZIP(), []int{6}
+	return file_datamesh_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ClientRequest) GetAction() ClientAction {
@@ -763,7 +966,7 @@ type ClientResponse struct {
 
 func (x *ClientResponse) Reset() {
 	*x = ClientResponse{}
-	mi := &file_datamesh_proto_msgTypes[7]
+	mi := &file_datamesh_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -775,7 +978,7 @@ func (x *ClientResponse) String() string {
 func (*ClientResponse) ProtoMessage() {}
 
 func (x *ClientResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_datamesh_proto_msgTypes[7]
+	mi := &file_datamesh_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -788,7 +991,7 @@ func (x *ClientResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClientResponse.ProtoReflect.Descriptor instead.
 func (*ClientResponse) Descriptor() ([]byte, []int) {
-	return file_datamesh_proto_rawDescGZIP(), []int{7}
+	return file_datamesh_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ClientResponse) GetSuccess() bool {
@@ -845,22 +1048,33 @@ const file_datamesh_proto_rawDesc = "" +
 	"\tis_online\x18\x05 \x01(\bR\bisOnline\x12#\n" +
 	"\rstate_summary\x18\x06 \x01(\tR\fstateSummary\x12 \n" +
 	"\flast_seen_ms\x18\a \x01(\x03R\n" +
-	"lastSeenMs\"\x99\x03\n" +
+	"lastSeenMs\";\n" +
+	"\x14TemperatureTelemetry\x12#\n" +
+	"\rtemperature_c\x18\x01 \x01(\x01R\ftemperatureC\"\x83\x02\n" +
+	"\vACTelemetry\x12#\n" +
+	"\rtemperature_c\x18\x01 \x01(\x01R\ftemperatureC\x12\"\n" +
+	"\rtarget_temp_c\x18\x02 \x01(\x01R\vtargetTempC\x12\"\n" +
+	"\rfan_speed_pct\x18\x03 \x01(\x05R\vfanSpeedPct\x12\x1f\n" +
+	"\vpower_watts\x18\x04 \x01(\x01R\n" +
+	"powerWatts\x12!\n" +
+	"\fcurrent_amps\x18\x05 \x01(\x01R\vcurrentAmps\x12#\n" +
+	"\rvoltage_volts\x18\x06 \x01(\x01R\fvoltageVolts\x12\x1e\n" +
+	"\vac_power_on\x18\a \x01(\bR\tacPowerOn\"w\n" +
+	"\fPDUTelemetry\x12\x1f\n" +
+	"\vpower_watts\x18\x01 \x01(\x01R\n" +
+	"powerWatts\x12!\n" +
+	"\fcurrent_amps\x18\x02 \x01(\x01R\vcurrentAmps\x12#\n" +
+	"\rvoltage_volts\x18\x03 \x01(\x01R\fvoltageVolts\"\xc7\x02\n" +
 	"\x0fTelemetryPacket\x12\x1b\n" +
 	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x125\n" +
 	"\vdevice_type\x18\x02 \x01(\x0e2\x14.datamesh.DeviceTypeR\n" +
 	"deviceType\x12!\n" +
 	"\ftimestamp_ms\x18\x03 \x01(\x03R\vtimestampMs\x12\x19\n" +
-	"\bis_alert\x18\x04 \x01(\bR\aisAlert\x12#\n" +
-	"\rtemperature_c\x18\x05 \x01(\x01R\ftemperatureC\x12\"\n" +
-	"\rtarget_temp_c\x18\x06 \x01(\x01R\vtargetTempC\x12\"\n" +
-	"\rfan_speed_pct\x18\a \x01(\x05R\vfanSpeedPct\x12\x1f\n" +
-	"\vpower_watts\x18\b \x01(\x01R\n" +
-	"powerWatts\x12!\n" +
-	"\fcurrent_amps\x18\t \x01(\x01R\vcurrentAmps\x12#\n" +
-	"\rvoltage_volts\x18\n" +
-	" \x01(\x01R\fvoltageVolts\x12\x1e\n" +
-	"\vac_power_on\x18\v \x01(\bR\tacPowerOn\"\x92\x01\n" +
+	"\bis_alert\x18\x04 \x01(\bR\aisAlert\x12B\n" +
+	"\vtemperature\x18\x05 \x01(\v2\x1e.datamesh.TemperatureTelemetryH\x00R\vtemperature\x12'\n" +
+	"\x02ac\x18\x06 \x01(\v2\x15.datamesh.ACTelemetryH\x00R\x02ac\x12*\n" +
+	"\x03pdu\x18\a \x01(\v2\x16.datamesh.PDUTelemetryH\x00R\x03pduB\t\n" +
+	"\apayload\"\x92\x01\n" +
 	"\x10ACControlRequest\x12\x1b\n" +
 	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12\x19\n" +
 	"\bpower_on\x18\x02 \x01(\bR\apowerOn\x12\"\n" +
@@ -928,38 +1142,44 @@ func file_datamesh_proto_rawDescGZIP() []byte {
 }
 
 var file_datamesh_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_datamesh_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_datamesh_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_datamesh_proto_goTypes = []any{
-	(DeviceType)(0),           // 0: datamesh.DeviceType
-	(ClientAction)(0),         // 1: datamesh.ClientAction
-	(AnalyticsQueryType)(0),   // 2: datamesh.AnalyticsQueryType
-	(*DiscoveryRequest)(nil),  // 3: datamesh.DiscoveryRequest
-	(*DeviceInfo)(nil),        // 4: datamesh.DeviceInfo
-	(*TelemetryPacket)(nil),   // 5: datamesh.TelemetryPacket
-	(*ACControlRequest)(nil),  // 6: datamesh.ACControlRequest
-	(*ACControlResponse)(nil), // 7: datamesh.ACControlResponse
-	(*AnalyticsResult)(nil),   // 8: datamesh.AnalyticsResult
-	(*ClientRequest)(nil),     // 9: datamesh.ClientRequest
-	(*ClientResponse)(nil),    // 10: datamesh.ClientResponse
+	(DeviceType)(0),              // 0: datamesh.DeviceType
+	(ClientAction)(0),            // 1: datamesh.ClientAction
+	(AnalyticsQueryType)(0),      // 2: datamesh.AnalyticsQueryType
+	(*DiscoveryRequest)(nil),     // 3: datamesh.DiscoveryRequest
+	(*DeviceInfo)(nil),           // 4: datamesh.DeviceInfo
+	(*TemperatureTelemetry)(nil), // 5: datamesh.TemperatureTelemetry
+	(*ACTelemetry)(nil),          // 6: datamesh.ACTelemetry
+	(*PDUTelemetry)(nil),         // 7: datamesh.PDUTelemetry
+	(*TelemetryPacket)(nil),      // 8: datamesh.TelemetryPacket
+	(*ACControlRequest)(nil),     // 9: datamesh.ACControlRequest
+	(*ACControlResponse)(nil),    // 10: datamesh.ACControlResponse
+	(*AnalyticsResult)(nil),      // 11: datamesh.AnalyticsResult
+	(*ClientRequest)(nil),        // 12: datamesh.ClientRequest
+	(*ClientResponse)(nil),       // 13: datamesh.ClientResponse
 }
 var file_datamesh_proto_depIdxs = []int32{
 	0,  // 0: datamesh.DeviceInfo.device_type:type_name -> datamesh.DeviceType
 	0,  // 1: datamesh.TelemetryPacket.device_type:type_name -> datamesh.DeviceType
-	4,  // 2: datamesh.ACControlResponse.updated_device:type_name -> datamesh.DeviceInfo
-	2,  // 3: datamesh.AnalyticsResult.query_type:type_name -> datamesh.AnalyticsQueryType
-	1,  // 4: datamesh.ClientRequest.action:type_name -> datamesh.ClientAction
-	6,  // 5: datamesh.ClientRequest.ac_control:type_name -> datamesh.ACControlRequest
-	2,  // 6: datamesh.ClientRequest.query_type:type_name -> datamesh.AnalyticsQueryType
-	4,  // 7: datamesh.ClientResponse.devices:type_name -> datamesh.DeviceInfo
-	8,  // 8: datamesh.ClientResponse.analytics:type_name -> datamesh.AnalyticsResult
-	5,  // 9: datamesh.ClientResponse.history:type_name -> datamesh.TelemetryPacket
-	6,  // 10: datamesh.AirConditionerService.SetControl:input_type -> datamesh.ACControlRequest
-	7,  // 11: datamesh.AirConditionerService.SetControl:output_type -> datamesh.ACControlResponse
-	11, // [11:12] is the sub-list for method output_type
-	10, // [10:11] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	5,  // 2: datamesh.TelemetryPacket.temperature:type_name -> datamesh.TemperatureTelemetry
+	6,  // 3: datamesh.TelemetryPacket.ac:type_name -> datamesh.ACTelemetry
+	7,  // 4: datamesh.TelemetryPacket.pdu:type_name -> datamesh.PDUTelemetry
+	4,  // 5: datamesh.ACControlResponse.updated_device:type_name -> datamesh.DeviceInfo
+	2,  // 6: datamesh.AnalyticsResult.query_type:type_name -> datamesh.AnalyticsQueryType
+	1,  // 7: datamesh.ClientRequest.action:type_name -> datamesh.ClientAction
+	9,  // 8: datamesh.ClientRequest.ac_control:type_name -> datamesh.ACControlRequest
+	2,  // 9: datamesh.ClientRequest.query_type:type_name -> datamesh.AnalyticsQueryType
+	4,  // 10: datamesh.ClientResponse.devices:type_name -> datamesh.DeviceInfo
+	11, // 11: datamesh.ClientResponse.analytics:type_name -> datamesh.AnalyticsResult
+	8,  // 12: datamesh.ClientResponse.history:type_name -> datamesh.TelemetryPacket
+	9,  // 13: datamesh.AirConditionerService.SetControl:input_type -> datamesh.ACControlRequest
+	10, // 14: datamesh.AirConditionerService.SetControl:output_type -> datamesh.ACControlResponse
+	14, // [14:15] is the sub-list for method output_type
+	13, // [13:14] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_datamesh_proto_init() }
@@ -967,13 +1187,18 @@ func file_datamesh_proto_init() {
 	if File_datamesh_proto != nil {
 		return
 	}
+	file_datamesh_proto_msgTypes[5].OneofWrappers = []any{
+		(*TelemetryPacket_Temperature)(nil),
+		(*TelemetryPacket_Ac)(nil),
+		(*TelemetryPacket_Pdu)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_datamesh_proto_rawDesc), len(file_datamesh_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   8,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

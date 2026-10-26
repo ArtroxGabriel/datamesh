@@ -32,7 +32,7 @@ def test_serializes_and_deserializes_telemetry_packet_with_alert_flag() -> None:
         device_type=datamesh_pb2.TEMPERATURE_SENSOR,
         timestamp_ms=1760000000000,
         is_alert=True,
-        temperature_c=38.5,
+        temperature=datamesh_pb2.TemperatureTelemetry(temperature_c=38.5),
     )
 
     # Act
@@ -41,7 +41,8 @@ def test_serializes_and_deserializes_telemetry_packet_with_alert_flag() -> None:
     # Assert
     assert restored.device_id == "temp-rack-02"
     assert restored.is_alert is True
-    assert abs(restored.temperature_c - 38.5) < 1e-4
+    assert restored.WhichOneof("payload") == "temperature"
+    assert abs(restored.temperature.temperature_c - 38.5) < 1e-4
 
 
 def test_serializes_and_deserializes_ac_control_messages() -> None:

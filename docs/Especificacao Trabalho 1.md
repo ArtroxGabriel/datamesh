@@ -66,30 +66,41 @@ Cada equipe deve escolher um dos domínios abaixo ou propor outro, desde que ate
 #### Requisitos
 
 1. **Comunicação e Serialização**:
-a. O **Protocol Buffers** deve ser usado para serializar todas as mensagens trocadas:
-i. Entre o Gateway e as Fontes de Dados (fluxo de dados via UDP e mensagens dos serviços gRPC). ii. Entre o Gateway e o Cliente.
-b. A comunicação deve utilizar:
-i. **TCP**: Mensagens entre o Cliente e o Gateway têm que utilizar sockets TCP. ii. **gRPC**: Comandos do Gateway para as fontes controláveis (e as respectivas respostas com o estado da fonte) têm que utilizar gRPC, com os serviços definidos em arquivos .proto. iii. **UDP:** Fluxos de dados das fontes para o Gateway devem usar UDP. iv. **UDP Multicast**: Para a descoberta inicial das fontes de dados.
+    1. O **Protocol Buffers** deve ser usado para serializar todas as mensagens trocadas:
+        1. Entre o Gateway e as Fontes de Dados (fluxo de dados via UDP e mensagens dos serviços gRPC).
+        2. Entre o Gateway e o Cliente.
+    1. A comunicação deve utilizar:
+        1. **TCP**: Mensagens entre o Cliente e o Gateway têm que utilizar sockets TCP.
+        2. **gRPC**: Comandos do Gateway para as fontes controláveis (e as respectivas respostas com o estado da fonte) têm que utilizar gRPC, com os serviços definidos em arquivos .proto.
+        3. **UDP:** Fluxos de dados das fontes para o Gateway devem usar UDP.
+        4. **UDP Multicast**: Para a descoberta inicial das fontes de dados.
 2. **Fontes de Dados:**
-a. Cada fonte de dados deve ser implementada como um processo separado, simulando o seu comportamento específico:
-i. **Fonte Controlável:** Deve implementar um servidor gRPC que recebe comandos de configuração do Gateway e reporta seu estado operacional. Também envia seus dados ao Gateway via UDP. Exemplo: um atuador que pode ser ligado/desligado remotamente ou um sensor com limiar de alerta ou frequência de envio ajustáveis. ii. **Fonte não controlável (sensor contínuo):** Deve enviar leituras de dados de tempos em tempos ao Gateway via UDP. Exemplo: um sensor que envia periodicamente (por exemplo, a cada 15 segundos) suas leituras para o Gateway.
+    1. Cada fonte de dados deve ser implementada como um processo separado, simulando o seu comportamento específico:
+        1. **Fonte Controlável:** Deve implementar um servidor gRPC que recebe comandos de configuração do Gateway e reporta seu estado operacional. Também envia seus dados ao Gateway via UDP. Exemplo: um atuador que pode ser ligado/desligado remotamente ou um sensor com limiar de alerta ou frequência de envio ajustáveis.
+        1. **Fonte não controlável (sensor contínuo):** Deve enviar leituras de dados de tempos em tempos ao Gateway via UDP. Exemplo: um sensor que envia periodicamente (por exemplo, a cada 15 segundos) suas leituras para o Gateway.
 
-b. Os IPs e portas do Gateway e das Fontes de Dados devem ser descobertos por meio de multicast UDP, onde as fontes devem enviar seu:
-i. Tipo (e.g., válvula de irrigação, sensor de vibração). ii. IP e porta (no caso das fontes controláveis, a porta do seu serviço gRPC). iii. Estado inicial (se aplicável).
-c. Pelo menos uma das fontes deve ter comportamento controlável (i.e., recebe comandos para modificar parâmetros de operação, como, por exemplo, alterar a frequência de envio ou ativar/desativar a fonte).
+    1. Os IPs e portas do Gateway e das Fontes de Dados devem ser descobertos por meio de multicast UDP, onde as fontes devem enviar seu:
+        1. Tipo (e.g., válvula de irrigação, sensor de vibração).
+        2. IP e porta (no caso das fontes controláveis, a porta do seu serviço gRPC).
+        3. Estado inicial (se aplicável).
+    1. Pelo menos uma das fontes deve ter comportamento controlável (i.e., recebe comandos para modificar parâmetros de operação, como, por exemplo, alterar a frequência de envio ou ativar/desativar a fonte).
 3. **Cliente**:
-a. Implementado como um processo separado que:
-i. Conecta-se ao Gateway via TCP. ii. Solicita e exibe informações das fontes de dados conectadas e seus respectivos estados operacionais. iii. Envia comandos para configurar fontes de dados específicas.
-b. Exemplo de comandos suportados:
-i. Listar as fontes de dados conectadas e seus respectivos estados. ii. Ativar/desativar uma fonte de dados. iii. Realizar consultas analíticas agregadas no Gateway (por exemplo, média de uma grandeza na última hora, desvio padrão de uma leitura nas últimas 24 horas, fonte com maior variação nas leituras).
+    1. Implementado como um processo separado que:
+        1. Conecta-se ao Gateway via TCP.
+        2. Solicita e exibe informações das fontes de dados conectadas e seus respectivos estados operacionais.
+        3.. Envia comandos para configurar fontes de dados específicas.
+    1. Exemplo de comandos suportados:
+        1. Listar as fontes de dados conectadas e seus respectivos estados.
+        2. Ativar/desativar uma fonte de dados.
+        3. Realizar consultas analíticas agregadas no Gateway (por exemplo, média de uma grandeza na última hora, desvio padrão de uma leitura nas últimas 24 horas, fonte com maior variação nas leituras).
 4. **Descoberta de Fontes**:
-a. O Gateway deve enviar uma mensagem multicast UDP ao ser iniciado, solicitando que as fontes de dados se identifiquem.
-b. As fontes de dados, ao receberem essa mensagem, devem responder com suas respectivas informações.
+    1. O Gateway deve enviar uma mensagem multicast UDP ao ser iniciado, solicitando que as fontes de dados se identifiquem.
+    1. As fontes de dados, ao receberem essa mensagem, devem responder com suas respectivas informações.
 5. **Escopo Mínimo do Domínio**:
-a. A equipe deve escolher um domínio da seção SUGESTÕES DE DOMÍNIOS DE APLICAÇÃO ou propor outro, informando-o na apresentação.
-b. O sistema deve ter, no mínimo, três tipos distintos de fontes de dados, sendo pelo menos um controlável e pelo menos um não controlável.
-c. Pelo menos um tipo de fonte deve enviar dados imediatamente ao detectar um evento relevante (p. ex., ultrapassagem de limiar), além do envio periódico.
-d. O Cliente deve oferecer, no mínimo, três consultas analíticas agregadas distintas, adequadas ao domínio escolhido.
+    1. A equipe deve escolher um domínio da seção SUGESTÕES DE DOMÍNIOS DE APLICAÇÃO ou propor outro, informando-o na apresentação.
+    1. O sistema deve ter, no mínimo, três tipos distintos de fontes de dados, sendo pelo menos um controlável e pelo menos um não controlável.
+    1. Pelo menos um tipo de fonte deve enviar dados imediatamente ao detectar um evento relevante (p. ex., ultrapassagem de limiar), além do envio periódico.
+    1. O Cliente deve oferecer, no mínimo, três consultas analíticas agregadas distintas, adequadas ao domínio escolhido.
 
 ## INSTRUÇÕES DE ENTREGA
 

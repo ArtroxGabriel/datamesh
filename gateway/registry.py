@@ -13,19 +13,21 @@ def _now_ms() -> int:
 
 
 def _build_state_summary(packet: datamesh_pb2.TelemetryPacket) -> str:
-    if packet.device_type == datamesh_pb2.AIR_CONDITIONER:
-        status = "ON" if packet.ac_power_on else "OFF"
+    which = packet.WhichOneof("payload")
+    if which == "ac" or packet.device_type == datamesh_pb2.AIR_CONDITIONER:
+        status = "ON" if packet.ac.ac_power_on else "OFF"
         return (
-            f"AC {status} | Temp: {packet.temperature_c:.1f} °C | "
-            f"Setpoint: {packet.target_temp_c:.1f} °C | Fan: {packet.fan_speed_pct}%"
+            f"AC {status} | Temp: {packet.ac.temperature_c:.1f} °C | "
+            f"Setpoint: {packet.ac.target_temp_c:.1f} °C | Fan: {packet.ac.fan_speed_pct}%"
         )
-    if packet.device_type == datamesh_pb2.RACK_PDU:
+    if which == "pdu" or packet.device_type == datamesh_pb2.RACK_PDU:
         return (
-            f"PDU {packet.power_watts:.1f} W | "
-            f"{packet.current_amps:.1f} A | {packet.voltage_volts:.1f} V"
+            f"PDU {packet.pdu.power_watts:.1f} W | "
+            f"{packet.pdu.current_amps:.1f} A | {packet.pdu.voltage_volts:.1f} V"
         )
     alert = " [ALERTA]" if packet.is_alert else ""
-    return f"Temp: {packet.temperature_c:.1f} °C{alert}"
+    temp = packet.temperature.temperature_c if which == "temperature" else 0.0
+    return f"Temp: {temp:.1f} °C{alert}"
 
 
 def _merge_announcement(

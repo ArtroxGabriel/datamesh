@@ -75,7 +75,7 @@ def test_creates_periodic_telemetry_packet(fake_socket: FakeUDPSocket) -> None:
     assert packet.device_id == "temp-rack-01"
     assert packet.device_type == datamesh_pb2.TEMPERATURE_SENSOR
     assert packet.is_alert is False
-    assert abs(packet.temperature_c - 24.5) < 1e-4
+    assert abs(packet.temperature.temperature_c - 24.5) < 1e-4
     assert packet.timestamp_ms > 0
 
 
@@ -95,7 +95,7 @@ def test_trigger_anomaly_sends_immediate_alert_packet(
 
     # Assert
     assert alert_packet.is_alert is True
-    assert alert_packet.temperature_c >= ALERT_THRESHOLD_TEMP_C
+    assert alert_packet.temperature.temperature_c >= ALERT_THRESHOLD_TEMP_C
     assert len(fake_socket.sent_packets) == 1
 
     raw_data, target = fake_socket.sent_packets[0]
@@ -105,7 +105,7 @@ def test_trigger_anomaly_sends_immediate_alert_packet(
     dispatched.ParseFromString(raw_data)
     assert dispatched.device_id == "temp-rack-01"
     assert dispatched.is_alert is True
-    assert abs(dispatched.temperature_c - 39.5) < 1e-4
+    assert abs(dispatched.temperature.temperature_c - 39.5) < 1e-4
 
 
 def test_handles_multicast_discovery_beacon(fake_socket: FakeUDPSocket) -> None:
@@ -144,7 +144,7 @@ def test_temperature_simulation_bounded_within_expected_range() -> None:
     reading = sensor.create_reading()
 
     # Assert: Simulated base temp should be within 20°C - 30°C
-    assert 20.0 <= reading.temperature_c <= 30.0
+    assert 20.0 <= reading.temperature.temperature_c <= 30.0
     assert reading.is_alert is False
 
 
@@ -275,7 +275,7 @@ def test_custom_base_temp_and_sigusr1_anomaly_trigger(fake_socket: FakeUDPSocket
         socket_factory=lambda: fake_socket,
     )
     reading = sensor.create_reading()
-    assert 26.5 <= reading.temperature_c <= 30.5
+    assert 26.5 <= reading.temperature.temperature_c <= 30.5
 
     stop_event = threading.Event()
     _setup_signals(sensor, stop_event, "temp-rack-02")
@@ -289,12 +289,12 @@ def test_custom_base_temp_and_sigusr1_anomaly_trigger(fake_socket: FakeUDPSocket
     dispatched.ParseFromString(fake_socket.sent_packets[0][0])
     assert dispatched.device_id == "temp-rack-02"
     assert dispatched.is_alert is True
-    assert dispatched.temperature_c >= ALERT_THRESHOLD_TEMP_C
+    assert dispatched.temperature.temperature_c >= ALERT_THRESHOLD_TEMP_C
 
     # Readings inside the hold window stay in anomaly state (> 35 C) so dashboard shows alert
     next_reading = sensor.create_reading()
     assert next_reading.is_alert is True
-    assert next_reading.temperature_c >= ALERT_THRESHOLD_TEMP_C
+    assert next_reading.temperature.temperature_c >= ALERT_THRESHOLD_TEMP_C
 
 
 def test_start_multicast_listener_before_start_keeps_listener_thread_alive() -> None:
@@ -333,7 +333,7 @@ def test_anomaly_stays_hot_during_hold_window(
 
     # Assert
     assert reading.is_alert is True
-    assert reading.temperature_c >= ALERT_THRESHOLD_TEMP_C
+    assert reading.temperature.temperature_c >= ALERT_THRESHOLD_TEMP_C
 
 
 def test_anomaly_cools_down_and_clears_alert_after_hold(
@@ -348,7 +348,7 @@ def test_anomaly_cools_down_and_clears_alert_after_hold(
     reading = sensor.create_reading()
 
     # Assert: still warmer than base, but below the clear threshold, so the alert is off
-    assert 26.0 + 3.0 < reading.temperature_c < ALERT_CLEAR_TEMP_C
+    assert 26.0 + 3.0 < reading.temperature.temperature_c < ALERT_CLEAR_TEMP_C
     assert reading.is_alert is False
 
 
@@ -365,7 +365,7 @@ def test_anomaly_settles_back_to_nominal_readings(
 
     # Assert: anomaly state is discarded and readings fall back to the base noise band
     assert sensor._anomaly is None
-    assert 26.0 - 1.5 <= reading.temperature_c <= 26.0 + 2.5
+    assert 26.0 - 1.5 <= reading.temperature.temperature_c <= 26.0 + 2.5
     assert reading.is_alert is False
 
 
@@ -397,7 +397,7 @@ def test_retrigger_during_cooling_restarts_hold_window(
 
     # Assert
     assert reading.is_alert is True
-    assert reading.temperature_c >= ALERT_THRESHOLD_TEMP_C
+    assert reading.temperature.temperature_c >= ALERT_THRESHOLD_TEMP_C
 
 
 def test_temperature_main_loads_anomaly_timing(monkeypatch: pytest.MonkeyPatch) -> None:
