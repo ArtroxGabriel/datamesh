@@ -6,8 +6,8 @@ Projeto prático desenvolvido para a disciplina de **Sistemas Distribuídos / Di
 
 ### Membros da Equipe
 
-- **Antonio Gabriel Carmo Rego** - Matrícula: `539628`
-- Lucas Lopes de Sousa - Matricula `537512`
+- **Antonio Gabriel Carmo Rego** — Matrícula: `539628`
+- **Lucas Lopes de Sousa** — Matrícula: `537512`
 
 ### Sumário
 
@@ -26,39 +26,50 @@ Projeto prático desenvolvido para a disciplina de **Sistemas Distribuídos / Di
 
 # 1. Arquitetura
 
-O sistema é dividido em três camadas estritamente desacopladas (**Fontes de Dados**, **Gateway Central** e **Cliente**), onde **100% do tráfego de rede é serializado via Protocol Buffers**:
+O sistema é dividido em três camadas estritamente desacopladas (**Fontes de Dados**, **Gateway Central** e **Cliente**), onde **100% do tráfego de rede é tipado e serializado via Protocol Buffers**:
 
-```
-+-----------------------------------------------------------------------------------+
-|                                 FONTES DE DADOS                                   |
-|                                                                                   |
-|  [Ar-Condicionado de Precisão]          [Sensor de Temperatura]        [PDU de Rack] |
-|   (Python - Controlável)                (Python - Event-Driven)        (Go - Contínuo)
-|   - gRPC Server (:50051 SetControl)     - UDP Telemetria               - UDP Telemetria
-|   - UDP Telemetria status               - Disparo Imediato (> 35°C)    - Potência/Corrente
-+-----------------------------------------------------------------------------------+
-                                         │ UDP Unicast (:9998) / Multicast (239.255.0.1:9999)
-                                         ▼
-+-----------------------------------------------------------------------------------+
-|                                 GATEWAY CENTRAL                                   |
-|                                                                                   |
-|  • Descoberta Dinâmica de Fontes via UDP Multicast (239.255.0.1:9999)             |
-|  • Ingestão de Fluxos UDP de Telemetria & Alertas (:9998)                         |
-|  • Armazenamento de Séries Temporais e Consultas Agregadas em SQLite (WAL)        |
-|  • Proxy de Comandos de Controle via gRPC Stubs                                   |
-|  • Servidor de Sessões TCP com Framing Length-Prefixed Protobuf (:9997)           |
-+-----------------------------------------------------------------------------------+
-                                         │ TCP (:9997 Length-Prefixed Protobuf)
-                                         ▼
-+-----------------------------------------------------------------------------------+
-|                         CLIENTE WEB (Python / FastAPI)                            |
-|                                                                                   |
-|  • Comunica-se com o Gateway exclusivamente via Socket TCP + Protobuf             |
-|  • Dashboard Web (:8080 HTML + Chart.js) com gráficos de séries temporais         |
-|  • Listagem agrupada de fontes e detecção passiva de falha (ONLINE / OFFLINE >15s)|
-|  • Envio de parâmetros de operação (ligar/desligar AC, setpoint, ventilação)      |
-|  • Execução das 3 consultas analíticas agregadas sobre o histórico                |
-+-----------------------------------------------------------------------------------+
+```mermaid
+flowchart TD
+    subgraph SOURCES["FONTES DE DADOS HETEROGÊNEAS"]
+        direction LR
+        AC["Ar-Condicionado de Precisão (Python) — gRPC Server :50051"]
+        TEMP["Sensor Térmico de Rack (Python) — Alerta Imediato > 35 °C"]
+        PDU["PDU de Rack (Go) — Potência, Corrente e Tensão"]
+    end
+
+    subgraph GATEWAY["GATEWAY CENTRAL (Python)"]
+        DISC["Descoberta Dinâmica Multicast (239.255.0.1:9999)"]
+        UDP_INGEST["Ingestão UDP de Telemetria e Alertas (:9998)"]
+        REGISTRY["Registro em Memória com Detecção de Falha (> 15s)"]
+        DB[("SQLite Local em Modo WAL — Séries Temporais e Analytics")]
+        GRPC_PROXY["Proxy de Atuação gRPC"]
+        TCP_SRV["Servidor TCP Length-Prefixed Protobuf (:9997)"]
+    end
+
+    subgraph CLIENT["CLIENTE WEB (Python / FastAPI)"]
+        TCP_CLI["Cliente TCP com Framing Protobuf"]
+        TIMELINE["Poller e Linha do Tempo de Eventos"]
+        HTTP_SRV["Servidor HTTP (:8080) e API REST"]
+        DASH["Dashboard SPA com Chart.js e Visualização /events"]
+    end
+
+    BROWSER["Navegador Web do Operador"]
+
+    DISC -.->|"Beacon DiscoveryRequest"| SOURCES
+    SOURCES -.->|"DeviceInfo Announcement"| DISC
+    SOURCES -->|"UDP Unicast: TelemetryPacket (oneof payload)"| UDP_INGEST
+
+    UDP_INGEST --> REGISTRY
+    UDP_INGEST --> DB
+    GRPC_PROXY -->|"RPC SetControl"| AC
+
+    TCP_SRV <==>|"Socket TCP: 4-byte Big-Endian + Protobuf"| TCP_CLI
+
+    TCP_CLI --> TIMELINE
+    TCP_CLI --> HTTP_SRV
+    TIMELINE --> HTTP_SRV
+    HTTP_SRV <==>|"HTTP / JSON REST"| DASH
+    DASH <==>|"Interface Web"| BROWSER
 ```
 
 ### Protocolos e Padrões Adotados
@@ -76,11 +87,15 @@ O sistema é dividido em três camadas estritamente desacopladas (**Fontes de Da
 
 ### 2.1. Contrato Protocol Buffers e Framing TCP (`proto/` & `common/`)
 >
-> Define a linguagem única de comunicação entre os processos em Python e Go e implementa a delimitação segura de mensagens em fluxos TCP.
+> Define a linguagem única de comunicação entre os processos em Python e Go, utiliza união polimórfica (`oneof`) para telemetrias heterogêneas e implementa a delimitação segura de mensagens em fluxos TCP.
 
 - **`proto/datamesh.proto`:** Centraliza todas as mensagens e enums do domínio:
-  - *Descoberta e Topologia:* `DiscoveryRequest`, `DeviceInfo` e `DeviceType` (`TEMPERATURE_SENSOR`, `RACK_PDU`, `AIR_CONDITIONER`).
-  - *Telemetria:* `TelemetryPacket` com métricas normalizadas (`temperature_c`, `target_temp_c`, `fan_speed_pct`, `power_watts`, `current_amps`, `voltage_volts`, `ac_power_on` e flag `is_alert`).
+  - *Descoberta e Topologia:* `DiscoveryRequest`, `DeviceInfo` e enum `DeviceType` (`TEMPERATURE_SENSOR`, `RACK_PDU`, `AIR_CONDITIONER`).
+  - *Telemetria com `oneof payload`:* O pacote unificado `TelemetryPacket` contém os metadados comuns (`device_id`, `device_type`, `timestamp_ms`, `is_alert`) e encapsula polimorficamente o payload específico de cada dispositivo via `oneof payload`:
+    - `TemperatureTelemetry`: leitura de temperatura em graus Celsius (`temperature_c`).
+    - `ACTelemetry`: leituras térmicas e operacionais (`temperature_c`, `target_temp_c`, `fan_speed_pct`, `power_watts`, `current_amps`, `voltage_volts`, `ac_power_on`).
+    - `PDUTelemetry`: leituras elétricas do rack (`power_watts`, `current_amps`, `voltage_volts`).
+    *Vantagem arquitetural:* elimina campos nulos ou ambíguos na serialização, garantindo tipagem estrita tanto em Python quanto em Go.
   - *Controle gRPC:* Serviço `AirConditionerService` com RPC `SetControl(ACControlRequest) returns (ACControlResponse)`.
   - *Sessão Cliente-Gateway e Analytics:* `ClientRequest`, `ClientResponse`, `AnalyticsResult` e os 3 tipos de consulta `AnalyticsQueryType` (`HOTTEST_RACK`, `AVG_PDU_POWER`, `THERMAL_STABILITY`).
 - **`common/framing.py`:** Implementa `send_proto` e `recv_proto` utilizando `struct.pack(">I", length)` (4 bytes *big-endian*) e leitura exata de buffer (`_recv_exact`), prevenindo fragmentação ou concatenação de pacotes em streams TCP.
@@ -185,13 +200,13 @@ uv run python -m client.main
 
 # 4. Verificação, Testes e Qualidade
 
-O projeto conta com suíte automatizada de testes unitários e de integração ponta a ponta (Python `pytest` com requisito mínimo de **80% de cobertura** e Go `go test`), além de checagem estrita de tipos (`ty` e `go vet`) e formatação (`ruff`):
+O projeto conta com suíte automatizada de testes unitários e de integração ponta a ponta (93 testes Python com requisito mínimo de **80% de cobertura**, atingindo **88.42%**, e 10 testes Go), além de checagem estrita de tipos (`ty` da Astral e `go vet`) e formatação (`ruff` e `gofmt`):
 
 ```bash
 # Executar pipeline completo de validação (proto -> lint -> typecheck -> tests)
 mise exec -- task check
 
-# Executar apenas a suíte Python com relatório de cobertura (76 testes, ~87% coverage)
+# Executar apenas a suíte Python com relatório de cobertura (93 testes, 88.42% coverage)
 uv run pytest
 
 # Executar apenas a suíte de testes Go da PDU (10 testes)
