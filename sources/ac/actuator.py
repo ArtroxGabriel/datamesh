@@ -191,13 +191,15 @@ class AirConditionerDevice:
                 device_type=datamesh_pb2.AIR_CONDITIONER,
                 timestamp_ms=_now_ms(),
                 is_alert=False,
-                temperature_c=round(self.current_temp_c, 2),
-                target_temp_c=round(self.target_temp_c, 2),
-                fan_speed_pct=self.fan_speed_pct,
-                power_watts=round(pwr, 2),
-                current_amps=round(current, 2),
-                voltage_volts=VOLTAGE_NOMINAL_VOLTS,
-                ac_power_on=self.power_on,
+                ac=datamesh_pb2.ACTelemetry(
+                    temperature_c=round(self.current_temp_c, 2),
+                    target_temp_c=round(self.target_temp_c, 2),
+                    fan_speed_pct=self.fan_speed_pct,
+                    power_watts=round(pwr, 2),
+                    current_amps=round(current, 2),
+                    voltage_volts=VOLTAGE_NOMINAL_VOLTS,
+                    ac_power_on=self.power_on,
+                ),
             )
 
     def send_telemetry(self) -> datamesh_pb2.TelemetryPacket | None:

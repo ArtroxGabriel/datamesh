@@ -36,7 +36,7 @@ def _reading(ts_ms: int, temp_c: float, is_alert: bool) -> datamesh_pb2.Telemetr
         device_id="temp-01",
         device_type=datamesh_pb2.TEMPERATURE_SENSOR,
         timestamp_ms=ts_ms,
-        temperature_c=temp_c,
+        temperature=datamesh_pb2.TemperatureTelemetry(temperature_c=temp_c),
         is_alert=is_alert,
     )
 

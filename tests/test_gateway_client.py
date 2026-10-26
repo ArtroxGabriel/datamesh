@@ -133,12 +133,12 @@ def test_get_history_sends_limit_and_unpacks_packets(
         history=[
             datamesh_pb2.TelemetryPacket(
                 device_id="temp-rack-01",
-                temperature_c=25.0,
+                temperature=datamesh_pb2.TemperatureTelemetry(temperature_c=25.0),
                 timestamp_ms=1000,
             ),
             datamesh_pb2.TelemetryPacket(
                 device_id="pdu-rack-01",
-                power_watts=1400.0,
+                pdu=datamesh_pb2.PDUTelemetry(power_watts=1400.0),
                 timestamp_ms=1001,
             ),
         ],

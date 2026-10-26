@@ -126,11 +126,12 @@ def test_creates_periodic_telemetry_packet(fake_socket: FakeUDPSocket) -> None:
     assert packet.device_id == "ac-rack-01"
     assert packet.device_type == datamesh_pb2.AIR_CONDITIONER
     assert packet.is_alert is False
-    assert packet.ac_power_on is True
-    assert packet.target_temp_c == DEFAULT_TARGET_TEMP_C
-    assert packet.fan_speed_pct == DEFAULT_FAN_SPEED_PCT
-    assert packet.power_watts > 0
-    assert packet.voltage_volts > 0
+    assert packet.WhichOneof("payload") == "ac"
+    assert packet.ac.ac_power_on is True
+    assert packet.ac.target_temp_c == DEFAULT_TARGET_TEMP_C
+    assert packet.ac.fan_speed_pct == DEFAULT_FAN_SPEED_PCT
+    assert packet.ac.power_watts > 0
+    assert packet.ac.voltage_volts > 0
     assert packet.timestamp_ms > 0
 
 

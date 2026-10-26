@@ -10,12 +10,16 @@ import (
 func TestSerializesAndDeserializesPDUTelemetryAndDiscovery(t *testing.T) {
 	// Arrange
 	original := &datameshpb.TelemetryPacket{
-		DeviceId:     "pdu-rack-01",
-		DeviceType:   datameshpb.DeviceType_RACK_PDU,
-		TimestampMs:  1760000000000,
-		PowerWatts:   1450.5,
-		CurrentAmps:  6.6,
-		VoltageVolts: 220.0,
+		DeviceId:    "pdu-rack-01",
+		DeviceType:  datameshpb.DeviceType_RACK_PDU,
+		TimestampMs: 1760000000000,
+		Payload: &datameshpb.TelemetryPacket_Pdu{
+			Pdu: &datameshpb.PDUTelemetry{
+				PowerWatts:   1450.5,
+				CurrentAmps:  6.6,
+				VoltageVolts: 220.0,
+			},
+		},
 	}
 
 	// Act
@@ -36,7 +40,7 @@ func TestSerializesAndDeserializesPDUTelemetryAndDiscovery(t *testing.T) {
 	if restored.GetDeviceType() != datameshpb.DeviceType_RACK_PDU {
 		t.Errorf("expected RACK_PDU, got %v", restored.GetDeviceType())
 	}
-	if restored.GetPowerWatts() != 1450.5 {
-		t.Errorf("expected power_watts 1450.5, got %f", restored.GetPowerWatts())
+	if restored.GetPdu().GetPowerWatts() != 1450.5 {
+		t.Errorf("expected power_watts 1450.5, got %f", restored.GetPdu().GetPowerWatts())
 	}
 }

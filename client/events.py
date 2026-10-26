@@ -135,7 +135,7 @@ class EventTimeline:
         self._alerting[packet.device_id] = packet.is_alert
         if packet.is_alert == was_alerting:
             return
-        temp = packet.temperature_c
+        temp = packet.temperature.temperature_c if packet.HasField("temperature") else 0.0
         if packet.is_alert:
             severity, message = SEVERITY_CRITICAL, f"ALERTA térmico: {temp:.1f} °C (limiar 35 °C)"
         else:

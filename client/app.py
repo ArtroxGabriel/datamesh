@@ -43,19 +43,35 @@ def _device_to_dict(d: datamesh_pb2.DeviceInfo) -> dict[str, Any]:
 
 
 def _telemetry_to_dict(t: datamesh_pb2.TelemetryPacket) -> dict[str, Any]:
-    type_name = datamesh_pb2.DeviceType.Name(t.device_type)
+    which = t.WhichOneof("payload")
+    temp = (
+        t.temperature.temperature_c
+        if which == "temperature"
+        else (t.ac.temperature_c if which == "ac" else 0.0)
+    )
+    target = t.ac.target_temp_c if which == "ac" else 0.0
+    fan = t.ac.fan_speed_pct if which == "ac" else 0
+    power = t.ac.power_watts if which == "ac" else (t.pdu.power_watts if which == "pdu" else 0.0)
+    current = (
+        t.ac.current_amps if which == "ac" else (t.pdu.current_amps if which == "pdu" else 0.0)
+    )
+    voltage = (
+        t.ac.voltage_volts if which == "ac" else (t.pdu.voltage_volts if which == "pdu" else 0.0)
+    )
+    ac_on = t.ac.ac_power_on if which == "ac" else False
+
     return {
         "device_id": t.device_id,
-        "device_type": type_name,
+        "device_type": datamesh_pb2.DeviceType.Name(t.device_type),
         "timestamp_ms": t.timestamp_ms,
         "is_alert": t.is_alert,
-        "temperature_c": t.temperature_c,
-        "target_temp_c": t.target_temp_c,
-        "fan_speed_pct": t.fan_speed_pct,
-        "power_watts": t.power_watts,
-        "current_amps": t.current_amps,
-        "voltage_volts": t.voltage_volts,
-        "ac_power_on": t.ac_power_on,
+        "temperature_c": temp,
+        "target_temp_c": target,
+        "fan_speed_pct": fan,
+        "power_watts": power,
+        "current_amps": current,
+        "voltage_volts": voltage,
+        "ac_power_on": ac_on,
     }
 
 
