@@ -17,6 +17,11 @@ export DB_PATH="${DB_PATH:-/tmp/datamesh-demo.db}"
 LOG_FILE="/tmp/datamesh-demo.log"
 PYTHON_BIN="${ROOT_DIR}/.venv/bin/python"
 
+if [[ ! -x "$PYTHON_BIN" ]]; then
+    echo "[DEMO] Ambiente Python não encontrado em ${ROOT_DIR}/.venv. Rode 'uv sync' antes."
+    exit 1
+fi
+
 rm -f "${DB_PATH}" "${DB_PATH}-wal" "${DB_PATH}-shm" "${LOG_FILE}"
 
 CORE_PIDS=()
@@ -51,6 +56,7 @@ cleanup() {
     echo ""
     echo "[DEMO] Encerrando processos do DataMesh DCIM..."
     for id in "${SOURCE_ORDER[@]:-}"; do
+        [[ -n "$id" ]] || continue
         pid="${SOURCE_PIDS[$id]:-}"
         if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
             kill -TERM "$pid" 2>/dev/null || true
@@ -124,6 +130,28 @@ sleep 1
 echo "[DEMO] Iniciando Cliente Web FastAPI em http://localhost:${WEB_PORT} ..."
 GATEWAY_PORT="${GATEWAY_TCP_PORT}" "$PYTHON_BIN" -m client.main >>"$LOG_FILE" 2>&1 &
 CORE_PIDS+=($!)
+
+# Sem esta espera, uma falha do Gateway ou do Cliente ficaria só no log e o menu abriria
+# com o dashboard fora do ar.
+wait_for_dashboard() {
+    for _ in {1..30}; do
+        for pid in "${CORE_PIDS[@]}"; do
+            kill -0 "$pid" 2>/dev/null || return 1
+        done
+        if (exec 3<>"/dev/tcp/127.0.0.1/${WEB_PORT}") 2>/dev/null; then
+            return 0
+        fi
+        sleep 0.5
+    done
+    return 1
+}
+
+if ! wait_for_dashboard; then
+    echo "[DEMO] O Gateway ou o Cliente Web não subiu. Últimas linhas do log (${LOG_FILE}):"
+    tail -n 20 "$LOG_FILE" || true
+    exit 1
+fi
+echo "[DEMO] Dashboard no ar em http://localhost:${WEB_PORT}"
 
 # Registra e inicia topologia inicial multi-rack com codinomes estilo Docker
 register_source "ac-01-carnot" "ac" "50051"
