@@ -15,6 +15,58 @@ from gateway.storage.queries import (
 )
 
 
+def _row_to_telemetry_packet(r: sqlite3.Row) -> datamesh_pb2.TelemetryPacket:
+    dev_type = r["device_type"]
+    dev_id = str(r["device_id"])
+    ts_ms = int(r["timestamp_ms"])
+    alert = bool(r["is_alert"])
+
+    if dev_type == datamesh_pb2.TEMPERATURE_SENSOR:
+        return datamesh_pb2.TelemetryPacket(
+            device_id=dev_id,
+            device_type=dev_type,
+            timestamp_ms=ts_ms,
+            is_alert=alert,
+            temperature=datamesh_pb2.TemperatureTelemetry(
+                temperature_c=float(r["temperature_c"] or 0.0)
+            ),
+        )
+    if dev_type == datamesh_pb2.AIR_CONDITIONER:
+        return datamesh_pb2.TelemetryPacket(
+            device_id=dev_id,
+            device_type=dev_type,
+            timestamp_ms=ts_ms,
+            is_alert=alert,
+            ac=datamesh_pb2.ACTelemetry(
+                temperature_c=float(r["temperature_c"] or 0.0),
+                target_temp_c=float(r["target_temp_c"] or 0.0),
+                fan_speed_pct=int(r["fan_speed_pct"] or 0),
+                power_watts=float(r["power_watts"] or 0.0),
+                current_amps=float(r["current_amps"] or 0.0),
+                voltage_volts=float(r["voltage_volts"] or 0.0),
+                ac_power_on=bool(r["ac_power_on"]),
+            ),
+        )
+    if dev_type == datamesh_pb2.RACK_PDU:
+        return datamesh_pb2.TelemetryPacket(
+            device_id=dev_id,
+            device_type=dev_type,
+            timestamp_ms=ts_ms,
+            is_alert=alert,
+            pdu=datamesh_pb2.PDUTelemetry(
+                power_watts=float(r["power_watts"] or 0.0),
+                current_amps=float(r["current_amps"] or 0.0),
+                voltage_volts=float(r["voltage_volts"] or 0.0),
+            ),
+        )
+    return datamesh_pb2.TelemetryPacket(
+        device_id=dev_id,
+        device_type=dev_type,
+        timestamp_ms=ts_ms,
+        is_alert=alert,
+    )
+
+
 class SQLiteTelemetryStorage:
     """Manages raw SQLite storage operations for telemetry readings."""
 
@@ -47,18 +99,43 @@ class SQLiteTelemetryStorage:
         Example:
             storage.record_telemetry(packet)
         """
+        which = packet.WhichOneof("payload")
+        temp = (
+            packet.temperature.temperature_c
+            if which == "temperature"
+            else (packet.ac.temperature_c if which == "ac" else 0.0)
+        )
+        target = packet.ac.target_temp_c if which == "ac" else 0.0
+        fan = packet.ac.fan_speed_pct if which == "ac" else 0
+        power = (
+            packet.ac.power_watts
+            if which == "ac"
+            else (packet.pdu.power_watts if which == "pdu" else 0.0)
+        )
+        current = (
+            packet.ac.current_amps
+            if which == "ac"
+            else (packet.pdu.current_amps if which == "pdu" else 0.0)
+        )
+        voltage = (
+            packet.ac.voltage_volts
+            if which == "ac"
+            else (packet.pdu.voltage_volts if which == "pdu" else 0.0)
+        )
+        ac_on = packet.ac.ac_power_on if which == "ac" else False
+
         values = (
             packet.device_id,
             packet.device_type,
             packet.timestamp_ms,
             int(packet.is_alert),
-            packet.temperature_c,
-            packet.target_temp_c,
-            packet.fan_speed_pct,
-            packet.power_watts,
-            packet.current_amps,
-            packet.voltage_volts,
-            int(packet.ac_power_on),
+            temp,
+            target,
+            fan,
+            power,
+            current,
+            voltage,
+            int(ac_on),
         )
         with self._lock:
             self._conn.execute(INSERT_TELEMETRY_SQL, values)
@@ -73,22 +150,7 @@ class SQLiteTelemetryStorage:
         with self._lock:
             rows = self._conn.execute(SELECT_RECENT_HISTORY_SQL, (limit,)).fetchall()
 
-        packets = [
-            datamesh_pb2.TelemetryPacket(
-                device_id=r["device_id"],
-                device_type=r["device_type"],
-                timestamp_ms=r["timestamp_ms"],
-                is_alert=bool(r["is_alert"]),
-                temperature_c=r["temperature_c"] or 0.0,
-                target_temp_c=r["target_temp_c"] or 0.0,
-                fan_speed_pct=r["fan_speed_pct"] or 0,
-                power_watts=r["power_watts"] or 0.0,
-                current_amps=r["current_amps"] or 0.0,
-                voltage_volts=r["voltage_volts"] or 0.0,
-                ac_power_on=bool(r["ac_power_on"]),
-            )
-            for r in rows
-        ]
+        packets = [_row_to_telemetry_packet(r) for r in rows]
         return packets[::-1]
 
     def fetch_hottest_rack_raw(self, cutoff_ms: int) -> tuple[str | None, float | None, int]:

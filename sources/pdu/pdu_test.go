@@ -67,14 +67,14 @@ func TestCreatesValidTelemetryPacket(t *testing.T) {
 	if packet.GetDeviceType() != datameshpb.DeviceType_RACK_PDU {
 		t.Errorf("expected device_type RACK_PDU, got %v", packet.GetDeviceType())
 	}
-	if packet.GetVoltageVolts() != 220.0 {
-		t.Errorf("expected voltage 220.0V, got %f", packet.GetVoltageVolts())
+	if packet.GetPdu().GetVoltageVolts() != 220.0 {
+		t.Errorf("expected voltage 220.0V, got %f", packet.GetPdu().GetVoltageVolts())
 	}
-	if packet.GetPowerWatts() <= 0.0 {
-		t.Errorf("expected positive power, got %f", packet.GetPowerWatts())
+	if packet.GetPdu().GetPowerWatts() <= 0.0 {
+		t.Errorf("expected positive power, got %f", packet.GetPdu().GetPowerWatts())
 	}
-	if packet.GetCurrentAmps() <= 0.0 {
-		t.Errorf("expected positive current, got %f", packet.GetCurrentAmps())
+	if packet.GetPdu().GetCurrentAmps() <= 0.0 {
+		t.Errorf("expected positive current, got %f", packet.GetPdu().GetCurrentAmps())
 	}
 	if packet.GetTimestampMs() <= 0 {
 		t.Errorf("expected positive timestamp, got %d", packet.GetTimestampMs())

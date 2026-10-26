@@ -46,7 +46,7 @@ def test_updates_device_from_telemetry_packet(registry: DeviceRegistry) -> None:
         device_id="temp-rack-01",
         device_type=datamesh_pb2.TEMPERATURE_SENSOR,
         timestamp_ms=2500,
-        temperature_c=27.4,
+        temperature=datamesh_pb2.TemperatureTelemetry(temperature_c=27.4),
     )
 
     # Act
@@ -100,7 +100,7 @@ def test_recovering_device_transitions_back_to_online(registry: DeviceRegistry) 
         device_id="temp-rack-02",
         device_type=datamesh_pb2.TEMPERATURE_SENSOR,
         timestamp_ms=32000,
-        temperature_c=24.5,
+        temperature=datamesh_pb2.TemperatureTelemetry(temperature_c=24.5),
     )
     registry.update_from_telemetry(telemetry)
     recovered = registry.get_device("temp-rack-02", current_time_ms=32500)
@@ -125,7 +125,7 @@ def test_updates_unseen_device_from_telemetry_creates_new_entry(
         device_id="unseen-temp-01",
         device_type=datamesh_pb2.TEMPERATURE_SENSOR,
         timestamp_ms=5000,
-        temperature_c=31.2,
+        temperature=datamesh_pb2.TemperatureTelemetry(temperature_c=31.2),
         is_alert=True,
     )
 
@@ -146,18 +146,22 @@ def test_builds_state_summaries_for_ac_and_pdu_types(registry: DeviceRegistry) -
         device_id="ac-01",
         device_type=datamesh_pb2.AIR_CONDITIONER,
         timestamp_ms=1000,
-        ac_power_on=True,
-        temperature_c=22.0,
-        target_temp_c=20.0,
-        fan_speed_pct=75,
+        ac=datamesh_pb2.ACTelemetry(
+            ac_power_on=True,
+            temperature_c=22.0,
+            target_temp_c=20.0,
+            fan_speed_pct=75,
+        ),
     )
     pdu_packet = datamesh_pb2.TelemetryPacket(
         device_id="pdu-01",
         device_type=datamesh_pb2.RACK_PDU,
         timestamp_ms=1000,
-        power_watts=1600.0,
-        current_amps=7.3,
-        voltage_volts=219.5,
+        pdu=datamesh_pb2.PDUTelemetry(
+            power_watts=1600.0,
+            current_amps=7.3,
+            voltage_volts=219.5,
+        ),
     )
 
     # Act
@@ -211,7 +215,7 @@ def test_reannouncement_keeps_telemetry_summary_and_fills_network_info(
             device_id="temp-rack-01",
             device_type=datamesh_pb2.TEMPERATURE_SENSOR,
             timestamp_ms=5_000,
-            temperature_c=38.8,
+            temperature=datamesh_pb2.TemperatureTelemetry(temperature_c=38.8),
             is_alert=True,
         )
     )

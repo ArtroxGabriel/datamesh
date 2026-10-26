@@ -43,19 +43,39 @@ message DeviceInfo {
   int64 last_seen_ms = 7;
 }
 
+// Sub-messages for specific source telemetry payloads (oneof)
+message TemperatureTelemetry {
+  double temperature_c = 1;
+}
+
+message ACTelemetry {
+  double temperature_c = 1;
+  double target_temp_c = 2;
+  int32 fan_speed_pct = 3;
+  double power_watts = 4;
+  double current_amps = 5;
+  double voltage_volts = 6;
+  bool ac_power_on = 7;
+}
+
+message PDUTelemetry {
+  double power_watts = 1;
+  double current_amps = 2;
+  double voltage_volts = 3;
+}
+
 // Continuous telemetry and immediate threshold alerts sent over UDP to Gateway
 message TelemetryPacket {
   string device_id = 1;
   DeviceType device_type = 2;
   int64 timestamp_ms = 3;
   bool is_alert = 4;
-  double temperature_c = 5;
-  double target_temp_c = 6;
-  int32 fan_speed_pct = 7;
-  double power_watts = 8;
-  double current_amps = 9;
-  double voltage_volts = 10;
-  bool ac_power_on = 11;
+
+  oneof payload {
+    TemperatureTelemetry temperature = 5;
+    ACTelemetry ac = 6;
+    PDUTelemetry pdu = 7;
+  }
 }
 
 // gRPC control payload for Precision Air Conditioner

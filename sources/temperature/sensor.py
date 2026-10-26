@@ -99,7 +99,7 @@ class TemperatureSensor:
             device_type=datamesh_pb2.TEMPERATURE_SENSOR,
             timestamp_ms=_now_ms(),
             is_alert=self._update_alert_state(temperature, forced=is_alert),
-            temperature_c=temperature,
+            temperature=datamesh_pb2.TemperatureTelemetry(temperature_c=temperature),
         )
 
     def _simulate_temperature(self) -> float:
@@ -147,7 +147,7 @@ class TemperatureSensor:
         logger.warning(
             "CRITICAL ALERT SENT: Device %s reached %.1f °C (hold %.0fs, then cooling)",
             self.device_id,
-            alert_packet.temperature_c,
+            alert_packet.temperature.temperature_c,
             self.anomaly_hold_sec,
         )
         return alert_packet

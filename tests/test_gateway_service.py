@@ -73,7 +73,7 @@ def test_handles_get_history_request(coordinator: GatewayCoordinator) -> None:
             device_id="temp-01",
             device_type=datamesh_pb2.TEMPERATURE_SENSOR,
             timestamp_ms=1000,
-            temperature_c=25.0,
+            temperature=datamesh_pb2.TemperatureTelemetry(temperature_c=25.0),
         )
     )
     req = datamesh_pb2.ClientRequest(
@@ -100,7 +100,7 @@ def test_handles_query_analytics_requests(coordinator: GatewayCoordinator) -> No
             device_id="temp-01",
             device_type=datamesh_pb2.TEMPERATURE_SENSOR,
             timestamp_ms=now_ms,
-            temperature_c=32.0,
+            temperature=datamesh_pb2.TemperatureTelemetry(temperature_c=32.0),
         )
     )
     coordinator.storage.record_telemetry(
@@ -108,7 +108,7 @@ def test_handles_query_analytics_requests(coordinator: GatewayCoordinator) -> No
             device_id="pdu-01",
             device_type=datamesh_pb2.RACK_PDU,
             timestamp_ms=now_ms,
-            power_watts=1500.0,
+            pdu=datamesh_pb2.PDUTelemetry(power_watts=1500.0),
         )
     )
 
@@ -207,7 +207,7 @@ def test_handles_udp_datagram_for_discovery_and_telemetry(
         device_id="temp-sensor-01",
         device_type=datamesh_pb2.TEMPERATURE_SENSOR,
         timestamp_ms=5500,
-        temperature_c=26.3,
+        temperature=datamesh_pb2.TemperatureTelemetry(temperature_c=26.3),
     )
 
     # Act
@@ -220,7 +220,7 @@ def test_handles_udp_datagram_for_discovery_and_telemetry(
     assert device is not None
     assert device.device_id == "temp-sensor-01"
     assert len(history) == 1
-    assert abs(history[0].temperature_c - 26.3) < 1e-4
+    assert abs(history[0].temperature.temperature_c - 26.3) < 1e-4
 
 
 def test_tcp_server_accepts_and_responds_over_real_socket(

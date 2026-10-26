@@ -128,9 +128,11 @@ def test_get_telemetry_history_returns_json_records(
             device_id="pdu-rack-01",
             device_type=datamesh_pb2.RACK_PDU,
             timestamp_ms=1700000000,
-            power_watts=1450.0,
-            current_amps=6.6,
-            voltage_volts=220.0,
+            pdu=datamesh_pb2.PDUTelemetry(
+                power_watts=1450.0,
+                current_amps=6.6,
+                voltage_volts=220.0,
+            ),
         )
     ]
 

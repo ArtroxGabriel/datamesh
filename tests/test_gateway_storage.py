@@ -18,13 +18,13 @@ def test_record_and_retrieve_recent_history(storage: TelemetryStorage) -> None:
         device_id="temp-rack-01",
         device_type=datamesh_pb2.TEMPERATURE_SENSOR,
         timestamp_ms=1000,
-        temperature_c=25.0,
+        temperature=datamesh_pb2.TemperatureTelemetry(temperature_c=25.0),
     )
     packet_2 = datamesh_pb2.TelemetryPacket(
         device_id="temp-rack-02",
         device_type=datamesh_pb2.TEMPERATURE_SENSOR,
         timestamp_ms=2000,
-        temperature_c=28.5,
+        temperature=datamesh_pb2.TemperatureTelemetry(temperature_c=28.5),
         is_alert=True,
     )
 
@@ -47,7 +47,7 @@ def test_query_hottest_rack(storage: TelemetryStorage) -> None:
             device_id="temp-rack-01",
             device_type=datamesh_pb2.TEMPERATURE_SENSOR,
             timestamp_ms=5000,
-            temperature_c=31.0,
+            temperature=datamesh_pb2.TemperatureTelemetry(temperature_c=31.0),
         )
     )
     storage.record_telemetry(
@@ -55,7 +55,7 @@ def test_query_hottest_rack(storage: TelemetryStorage) -> None:
             device_id="temp-rack-02",
             device_type=datamesh_pb2.TEMPERATURE_SENSOR,
             timestamp_ms=6000,
-            temperature_c=39.2,
+            temperature=datamesh_pb2.TemperatureTelemetry(temperature_c=39.2),
             is_alert=True,
         )
     )
@@ -78,7 +78,7 @@ def test_query_average_pdu_power(storage: TelemetryStorage) -> None:
             device_id="pdu-rack-01",
             device_type=datamesh_pb2.RACK_PDU,
             timestamp_ms=5000,
-            power_watts=1200.0,
+            pdu=datamesh_pb2.PDUTelemetry(power_watts=1200.0),
         )
     )
     storage.record_telemetry(
@@ -86,7 +86,7 @@ def test_query_average_pdu_power(storage: TelemetryStorage) -> None:
             device_id="pdu-rack-02",
             device_type=datamesh_pb2.RACK_PDU,
             timestamp_ms=6000,
-            power_watts=1800.0,
+            pdu=datamesh_pb2.PDUTelemetry(power_watts=1800.0),
         )
     )
 
@@ -107,7 +107,7 @@ def test_query_thermal_stability(storage: TelemetryStorage) -> None:
             device_id="temp-rack-01",
             device_type=datamesh_pb2.TEMPERATURE_SENSOR,
             timestamp_ms=5000,
-            temperature_c=20.0,
+            temperature=datamesh_pb2.TemperatureTelemetry(temperature_c=20.0),
         )
     )
     storage.record_telemetry(
@@ -115,7 +115,7 @@ def test_query_thermal_stability(storage: TelemetryStorage) -> None:
             device_id="temp-rack-02",
             device_type=datamesh_pb2.TEMPERATURE_SENSOR,
             timestamp_ms=6000,
-            temperature_c=30.0,
+            temperature=datamesh_pb2.TemperatureTelemetry(temperature_c=30.0),
         )
     )
 
@@ -153,13 +153,13 @@ def test_queries_exclude_records_outside_time_window(storage: TelemetryStorage) 
         device_id="temp-old",
         device_type=datamesh_pb2.TEMPERATURE_SENSOR,
         timestamp_ms=5000,
-        temperature_c=45.0,
+        temperature=datamesh_pb2.TemperatureTelemetry(temperature_c=45.0),
     )
     recent = datamesh_pb2.TelemetryPacket(
         device_id="temp-recent",
         device_type=datamesh_pb2.TEMPERATURE_SENSOR,
         timestamp_ms=15000,
-        temperature_c=25.0,
+        temperature=datamesh_pb2.TemperatureTelemetry(temperature_c=25.0),
     )
     storage.record_telemetry(expired)
     storage.record_telemetry(recent)
@@ -183,7 +183,7 @@ def test_sqlite_storage_and_analytics_components_directly() -> None:
                 device_id="temp-01",
                 device_type=datamesh_pb2.TEMPERATURE_SENSOR,
                 timestamp_ms=1000,
-                temperature_c=22.0,
+                temperature=datamesh_pb2.TemperatureTelemetry(temperature_c=22.0),
             )
         )
         engine = AnalyticsEngine(raw_storage)

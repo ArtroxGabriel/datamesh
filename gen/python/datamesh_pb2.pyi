@@ -68,12 +68,14 @@ class DeviceInfo(_message.Message):
     last_seen_ms: int
     def __init__(self, device_id: _Optional[str] = ..., device_type: _Optional[_Union[DeviceType, str]] = ..., ip: _Optional[str] = ..., grpc_port: _Optional[int] = ..., is_online: _Optional[bool] = ..., state_summary: _Optional[str] = ..., last_seen_ms: _Optional[int] = ...) -> None: ...
 
-class TelemetryPacket(_message.Message):
-    __slots__ = ("device_id", "device_type", "timestamp_ms", "is_alert", "temperature_c", "target_temp_c", "fan_speed_pct", "power_watts", "current_amps", "voltage_volts", "ac_power_on")
-    DEVICE_ID_FIELD_NUMBER: _ClassVar[int]
-    DEVICE_TYPE_FIELD_NUMBER: _ClassVar[int]
-    TIMESTAMP_MS_FIELD_NUMBER: _ClassVar[int]
-    IS_ALERT_FIELD_NUMBER: _ClassVar[int]
+class TemperatureTelemetry(_message.Message):
+    __slots__ = ("temperature_c",)
+    TEMPERATURE_C_FIELD_NUMBER: _ClassVar[int]
+    temperature_c: float
+    def __init__(self, temperature_c: _Optional[float] = ...) -> None: ...
+
+class ACTelemetry(_message.Message):
+    __slots__ = ("temperature_c", "target_temp_c", "fan_speed_pct", "power_watts", "current_amps", "voltage_volts", "ac_power_on")
     TEMPERATURE_C_FIELD_NUMBER: _ClassVar[int]
     TARGET_TEMP_C_FIELD_NUMBER: _ClassVar[int]
     FAN_SPEED_PCT_FIELD_NUMBER: _ClassVar[int]
@@ -81,10 +83,6 @@ class TelemetryPacket(_message.Message):
     CURRENT_AMPS_FIELD_NUMBER: _ClassVar[int]
     VOLTAGE_VOLTS_FIELD_NUMBER: _ClassVar[int]
     AC_POWER_ON_FIELD_NUMBER: _ClassVar[int]
-    device_id: str
-    device_type: DeviceType
-    timestamp_ms: int
-    is_alert: bool
     temperature_c: float
     target_temp_c: float
     fan_speed_pct: int
@@ -92,7 +90,35 @@ class TelemetryPacket(_message.Message):
     current_amps: float
     voltage_volts: float
     ac_power_on: bool
-    def __init__(self, device_id: _Optional[str] = ..., device_type: _Optional[_Union[DeviceType, str]] = ..., timestamp_ms: _Optional[int] = ..., is_alert: _Optional[bool] = ..., temperature_c: _Optional[float] = ..., target_temp_c: _Optional[float] = ..., fan_speed_pct: _Optional[int] = ..., power_watts: _Optional[float] = ..., current_amps: _Optional[float] = ..., voltage_volts: _Optional[float] = ..., ac_power_on: _Optional[bool] = ...) -> None: ...
+    def __init__(self, temperature_c: _Optional[float] = ..., target_temp_c: _Optional[float] = ..., fan_speed_pct: _Optional[int] = ..., power_watts: _Optional[float] = ..., current_amps: _Optional[float] = ..., voltage_volts: _Optional[float] = ..., ac_power_on: _Optional[bool] = ...) -> None: ...
+
+class PDUTelemetry(_message.Message):
+    __slots__ = ("power_watts", "current_amps", "voltage_volts")
+    POWER_WATTS_FIELD_NUMBER: _ClassVar[int]
+    CURRENT_AMPS_FIELD_NUMBER: _ClassVar[int]
+    VOLTAGE_VOLTS_FIELD_NUMBER: _ClassVar[int]
+    power_watts: float
+    current_amps: float
+    voltage_volts: float
+    def __init__(self, power_watts: _Optional[float] = ..., current_amps: _Optional[float] = ..., voltage_volts: _Optional[float] = ...) -> None: ...
+
+class TelemetryPacket(_message.Message):
+    __slots__ = ("device_id", "device_type", "timestamp_ms", "is_alert", "temperature", "ac", "pdu")
+    DEVICE_ID_FIELD_NUMBER: _ClassVar[int]
+    DEVICE_TYPE_FIELD_NUMBER: _ClassVar[int]
+    TIMESTAMP_MS_FIELD_NUMBER: _ClassVar[int]
+    IS_ALERT_FIELD_NUMBER: _ClassVar[int]
+    TEMPERATURE_FIELD_NUMBER: _ClassVar[int]
+    AC_FIELD_NUMBER: _ClassVar[int]
+    PDU_FIELD_NUMBER: _ClassVar[int]
+    device_id: str
+    device_type: DeviceType
+    timestamp_ms: int
+    is_alert: bool
+    temperature: TemperatureTelemetry
+    ac: ACTelemetry
+    pdu: PDUTelemetry
+    def __init__(self, device_id: _Optional[str] = ..., device_type: _Optional[_Union[DeviceType, str]] = ..., timestamp_ms: _Optional[int] = ..., is_alert: _Optional[bool] = ..., temperature: _Optional[_Union[TemperatureTelemetry, _Mapping]] = ..., ac: _Optional[_Union[ACTelemetry, _Mapping]] = ..., pdu: _Optional[_Union[PDUTelemetry, _Mapping]] = ...) -> None: ...
 
 class ACControlRequest(_message.Message):
     __slots__ = ("device_id", "power_on", "target_temp_c", "fan_speed_pct")

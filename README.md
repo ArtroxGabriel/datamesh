@@ -22,37 +22,48 @@ O projeto é o Trabalho 1 da disciplina Sistemas Distribuídos / Distribuição 
 
 O sistema tem três partes que rodam em processos separados. As fontes de dados simulam equipamentos, o Gateway concentra tudo e o Cliente mostra os dados ao usuário. Todas as mensagens trocadas pela rede são serializadas com Protocol Buffers, um formato binário definido no arquivo `proto/datamesh.proto`.
 
-```
-+-----------------------------------------------------------------------------------+
-|                                 FONTES DE DADOS                                   |
-|                                                                                   |
-|  [Ar-Condicionado de Precisão]          [Sensor de Temperatura]        [PDU de Rack] |
-|   (Python, controlável)                 (Python, envia alertas)        (Go, contínua)
-|   - Servidor gRPC (:50051 SetControl)   - Telemetria UDP               - Telemetria UDP
-|   - Telemetria UDP                      - Alerta imediato (> 35 °C)    - Potência e corrente
-+-----------------------------------------------------------------------------------+
-                                         │ UDP unicast (:9998) e multicast (239.255.0.1:9999)
-                                         ▼
-+-----------------------------------------------------------------------------------+
-|                                 GATEWAY                                           |
-|                                                                                   |
-|  - Descoberta de fontes por UDP multicast (239.255.0.1:9999)                      |
-|  - Recebe telemetria e alertas por UDP (:9998)                                    |
-|  - Guarda as leituras em SQLite e calcula as consultas agregadas                  |
-|  - Repassa comandos ao ar-condicionado por gRPC                                   |
-|  - Atende o Cliente por TCP com mensagens prefixadas pelo tamanho (:9997)         |
-+-----------------------------------------------------------------------------------+
-                                         │ TCP (:9997)
-                                         ▼
-+-----------------------------------------------------------------------------------+
-|                         CLIENTE WEB (Python / FastAPI)                            |
-|                                                                                   |
-|  - Fala com o Gateway só por TCP e Protobuf                                       |
-|  - Dashboard (:8080, HTML e Chart.js) com gráficos das leituras                   |
-|  - Lista as fontes agrupadas por tipo, com estado ONLINE ou OFFLINE               |
-|  - Liga e desliga o ar-condicionado e ajusta setpoint e ventilação                |
-|  - Executa as 3 consultas agregadas sobre o histórico                             |
-+-----------------------------------------------------------------------------------+
+```mermaid
+flowchart TD
+    subgraph SOURCES["FONTES DE DADOS HETEROGÊNEAS"]
+        direction LR
+        AC["Ar-Condicionado de Precisão (Python) — gRPC Server :50051"]
+        TEMP["Sensor Térmico de Rack (Python) — Alerta Imediato > 35 °C"]
+        PDU["PDU de Rack (Go) — Potência, Corrente e Tensão"]
+    end
+
+    subgraph GATEWAY["GATEWAY CENTRAL (Python)"]
+        DISC["Descoberta Dinâmica Multicast (239.255.0.1:9999)"]
+        UDP_INGEST["Ingestão UDP de Telemetria e Alertas (:9998)"]
+        REGISTRY["Registro em Memória com Detecção de Falha (> 15s)"]
+        DB[("SQLite Local em Modo WAL — Séries Temporais e Analytics")]
+        GRPC_PROXY["Proxy de Atuação gRPC"]
+        TCP_SRV["Servidor TCP Length-Prefixed Protobuf (:9997)"]
+    end
+
+    subgraph CLIENT["CLIENTE WEB (Python / FastAPI)"]
+        TCP_CLI["Cliente TCP com Framing Protobuf"]
+        TIMELINE["Poller e Linha do Tempo de Eventos"]
+        HTTP_SRV["Servidor HTTP (:8080) e API REST"]
+        DASH["Dashboard SPA com Chart.js e Visualização /events"]
+    end
+
+    BROWSER["Navegador Web do Operador"]
+
+    DISC -.->|"Beacon DiscoveryRequest"| SOURCES
+    SOURCES -.->|"DeviceInfo Announcement"| DISC
+    SOURCES -->|"UDP Unicast: TelemetryPacket (oneof payload)"| UDP_INGEST
+
+    UDP_INGEST --> REGISTRY
+    UDP_INGEST --> DB
+    GRPC_PROXY -->|"RPC SetControl"| AC
+
+    TCP_SRV <==>|"Socket TCP: 4-byte Big-Endian + Protobuf"| TCP_CLI
+
+    TCP_CLI --> TIMELINE
+    TCP_CLI --> HTTP_SRV
+    TIMELINE --> HTTP_SRV
+    HTTP_SRV <==>|"HTTP / JSON REST"| DASH
+    DASH <==>|"Interface Web"| BROWSER
 ```
 
 ### Protocolos
@@ -71,7 +82,10 @@ O sistema tem três partes que rodam em processos separados. As fontes de dados 
 O arquivo `proto/datamesh.proto` define todas as mensagens e o serviço gRPC num só lugar, para o Python e o Go usarem o mesmo contrato.
 
 - A descoberta usa `DiscoveryRequest`, `DeviceInfo` e `DeviceType` (`TEMPERATURE_SENSOR`, `RACK_PDU`, `AIR_CONDITIONER`).
-- A telemetria usa `TelemetryPacket`, com `temperature_c`, `target_temp_c`, `fan_speed_pct`, `power_watts`, `current_amps`, `voltage_volts`, `ac_power_on` e a marca de alerta `is_alert`.
+- A telemetria usa `TelemetryPacket`. Ele traz os campos comuns (`device_id`, `device_type`, `timestamp_ms` e a marca de alerta `is_alert`) e um `oneof payload` com os dados de cada tipo de fonte. O `oneof` do Protobuf guarda só um dos campos por vez, então cada pacote leva apenas os dados da fonte que o enviou.
+  - `TemperatureTelemetry` tem a temperatura (`temperature_c`).
+  - `ACTelemetry` tem `temperature_c`, `target_temp_c`, `fan_speed_pct`, `power_watts`, `current_amps`, `voltage_volts` e `ac_power_on`.
+  - `PDUTelemetry` tem `power_watts`, `current_amps` e `voltage_volts`.
 - O controle usa o serviço `AirConditionerService`, com `SetControl(ACControlRequest) returns (ACControlResponse)`.
 - O Cliente usa `ClientRequest`, `ClientResponse` e `AnalyticsResult`. As consultas são `HOTTEST_RACK`, `AVG_PDU_POWER` e `THERMAL_STABILITY`.
 

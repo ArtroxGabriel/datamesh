@@ -144,13 +144,17 @@ func (p *PDU) CreateTelemetryPacket() *datameshpb.TelemetryPacket {
 	current := power / voltage
 
 	return &datameshpb.TelemetryPacket{
-		DeviceId:     deviceID,
-		DeviceType:   datameshpb.DeviceType_RACK_PDU,
-		TimestampMs:  time.Now().UnixMilli(),
-		IsAlert:      false,
-		PowerWatts:   power,
-		CurrentAmps:  current,
-		VoltageVolts: voltage,
+		DeviceId:    deviceID,
+		DeviceType:  datameshpb.DeviceType_RACK_PDU,
+		TimestampMs: time.Now().UnixMilli(),
+		IsAlert:     false,
+		Payload: &datameshpb.TelemetryPacket_Pdu{
+			Pdu: &datameshpb.PDUTelemetry{
+				PowerWatts:   power,
+				CurrentAmps:  current,
+				VoltageVolts: voltage,
+			},
+		},
 	}
 }
 
