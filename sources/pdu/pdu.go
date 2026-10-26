@@ -14,8 +14,10 @@ import (
 )
 
 const (
-	DefaultDeviceID       = "pdu-rack-01"
-	DefaultGatewayHost    = "127.0.0.1"
+	DefaultDeviceID = "pdu-rack-01"
+	// Empty on purpose, so the PDU only streams after it finds the Gateway through
+	// multicast discovery. Set GATEWAY_HOST to pin a fixed address instead.
+	DefaultGatewayHost    = ""
 	DefaultGatewayPort    = 9998
 	DefaultSendInterval   = 3 * time.Second
 	DefaultMulticastGroup = "239.255.0.1"
@@ -75,8 +77,14 @@ type PDU struct {
 }
 
 // NewPDU constructs a PDU instance with validated defaults and network endpoints.
+// Without GatewayHost the gateway address stays unknown until a discovery beacon arrives.
 func NewPDU(cfg Config, sender UDPPacketSender) (*PDU, error) {
 	resolvedCfg := applyDefaults(cfg)
+	unit := &PDU{cfg: resolvedCfg, sender: sender}
+	if resolvedCfg.GatewayHost == "" {
+		return unit, nil
+	}
+
 	gwAddr, err := net.ResolveUDPAddr(
 		"udp4",
 		fmt.Sprintf("%s:%d", resolvedCfg.GatewayHost, resolvedCfg.GatewayPort),
@@ -84,20 +92,13 @@ func NewPDU(cfg Config, sender UDPPacketSender) (*PDU, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve gateway address: %w", err)
 	}
-
-	return &PDU{
-		cfg:         resolvedCfg,
-		gatewayAddr: gwAddr,
-		sender:      sender,
-	}, nil
+	unit.gatewayAddr = gwAddr
+	return unit, nil
 }
 
 func applyDefaults(c Config) Config {
 	if c.DeviceID == "" {
 		c.DeviceID = DefaultDeviceID
-	}
-	if c.GatewayHost == "" {
-		c.GatewayHost = DefaultGatewayHost
 	}
 	if c.GatewayPort <= 0 {
 		c.GatewayPort = DefaultGatewayPort
@@ -120,10 +121,13 @@ func applyDefaults(c Config) Config {
 	return c
 }
 
-// GatewayEndpoint returns the currently targeted host and UDP port.
+// GatewayEndpoint returns the currently targeted host and UDP port, or ("", 0) before discovery.
 func (p *PDU) GatewayEndpoint() (string, int) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
+	if p.gatewayAddr == nil {
+		return "", 0
+	}
 	return p.gatewayAddr.IP.String(), p.gatewayAddr.Port
 }
 
@@ -151,16 +155,20 @@ func (p *PDU) CreateTelemetryPacket() *datameshpb.TelemetryPacket {
 }
 
 // SendTelemetry serializes and sends a telemetry packet to the current Gateway endpoint.
+// It does nothing while the gateway is still unknown.
 func (p *PDU) SendTelemetry() error {
+	p.mu.RLock()
+	target := p.gatewayAddr
+	p.mu.RUnlock()
+	if target == nil {
+		return nil
+	}
+
 	packet := p.CreateTelemetryPacket()
 	payload, err := proto.Marshal(packet)
 	if err != nil {
 		return fmt.Errorf("failed to marshal telemetry packet: %w", err)
 	}
-
-	p.mu.RLock()
-	target := p.gatewayAddr
-	p.mu.RUnlock()
 
 	if _, err := p.sender.SendTo(payload, target); err != nil {
 		return fmt.Errorf("failed to transmit UDP packet to %v: %w", target, err)

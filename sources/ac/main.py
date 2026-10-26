@@ -19,8 +19,10 @@ logger = logging.getLogger("ac-actuator")
 def _load_config() -> tuple[str, int, str, str, int, float, str, int]:
     device_id = os.getenv("AC_DEVICE_ID", "ac-rack-01")
     grpc_port = int(os.getenv("AC_GRPC_PORT", "50051"))
-    adv_ip = os.getenv("AC_ADVERTISED_IP", "127.0.0.1")
-    gateway_host = os.getenv("GATEWAY_HOST", "127.0.0.1")
+    # Empty IP lets the Gateway use the address the announcement came from.
+    adv_ip = os.getenv("AC_ADVERTISED_IP", "")
+    # Empty host makes the AC wait for a discovery beacon before streaming.
+    gateway_host = os.getenv("GATEWAY_HOST", "")
     gateway_port = int(os.getenv("GATEWAY_PORT", "9998"))
     interval_sec = float(os.getenv("SEND_INTERVAL_SEC", "5.0"))
     mcast_group = os.getenv("MULTICAST_GROUP", "239.255.0.1")
@@ -70,7 +72,8 @@ def main() -> None:
     device.start_grpc_server()
     device.start_multicast_listener()
     device.start()
-    logger.info("AC %s active (gRPC :%d, streaming to %s:%d)", cfg[0], cfg[1], cfg[3], cfg[4])
+    target_desc = f"{cfg[3]}:{cfg[4]}" if cfg[3] else "awaiting multicast beacon"
+    logger.info("AC %s active (gRPC :%d, target: %s)", cfg[0], cfg[1], target_desc)
 
     while not stop_event.is_set():
         time.sleep(1.0)

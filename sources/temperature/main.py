@@ -41,7 +41,8 @@ def _interactive_anomaly_trigger(sensor: TemperatureSensor, stop_event: threadin
 
 def _load_config() -> tuple[str, str | None, int | None, float, str, int, float]:
     sensor_id = os.getenv("SENSOR_ID", "temp-rack-01")
-    raw_host = os.getenv("GATEWAY_HOST", "127.0.0.1")
+    # Empty by default, so the sensor waits for a discovery beacon before streaming.
+    raw_host = os.getenv("GATEWAY_HOST", "")
     gateway_host = raw_host if raw_host else None
     raw_port = int(os.getenv("GATEWAY_PORT", "9998"))
     gateway_port = raw_port if raw_port > 0 else None

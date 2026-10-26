@@ -364,3 +364,21 @@ def test_gateway_and_client_share_default_tcp_port() -> None:
     assert DEFAULT_TCP_PORT == DEFAULT_GATEWAY_PORT == 9997
     assert app.tcp_port == client_gw_port == 9997
     app.stop()
+
+
+def test_announcement_without_ip_uses_sender_address(coordinator: GatewayCoordinator) -> None:
+    # Arrange
+    announcement = datamesh_pb2.DeviceInfo(
+        device_id="ac-rack-01",
+        device_type=datamesh_pb2.AIR_CONDITIONER,
+        grpc_port=50051,
+    )
+
+    # Act
+    coordinator.handle_udp_datagram(announcement.SerializeToString(), ("10.0.0.7", 40000))
+
+    # Assert
+    device = coordinator.registry.get_device("ac-rack-01")
+    assert device is not None
+    assert device.ip == "10.0.0.7"
+    assert device.grpc_port == 50051

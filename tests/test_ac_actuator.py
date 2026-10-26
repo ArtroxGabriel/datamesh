@@ -330,3 +330,18 @@ def test_ac_main_load_config_and_signals(monkeypatch: pytest.MonkeyPatch) -> Non
     device = AirConditionerDevice(device_id="ac-custom-01")
     stop_event = threading.Event()
     _setup_signals(device, stop_event, "ac-custom-01")
+
+
+def test_ac_main_waits_for_discovery_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Arrange
+    from sources.ac.main import _load_config
+
+    monkeypatch.delenv("GATEWAY_HOST", raising=False)
+    monkeypatch.delenv("AC_ADVERTISED_IP", raising=False)
+
+    # Act
+    cfg = _load_config()
+
+    # Assert
+    assert cfg[2] == ""
+    assert cfg[3] == ""

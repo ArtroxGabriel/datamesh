@@ -87,7 +87,7 @@ class AirConditionerDevice:
         self,
         device_id: str = "ac-rack-01",
         grpc_port: int = DEFAULT_GRPC_PORT,
-        advertised_ip: str = "127.0.0.1",
+        advertised_ip: str = "",
         gateway_host: str | None = None,
         gateway_port: int | None = None,
         send_interval_sec: float = DEFAULT_INTERVAL_SECONDS,
