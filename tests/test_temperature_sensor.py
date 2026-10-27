@@ -407,3 +407,16 @@ def test_temperature_main_loads_anomaly_timing(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setenv("ANOMALY_DECAY_SEC", "7.5")
 
     assert _load_anomaly_timing() == (45.0, 7.5)
+
+
+def test_temperature_main_waits_for_discovery_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Arrange
+    from sources.temperature.main import _load_config
+
+    monkeypatch.delenv("GATEWAY_HOST", raising=False)
+
+    # Act
+    cfg = _load_config()
+
+    # Assert
+    assert cfg[1] is None

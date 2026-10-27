@@ -242,3 +242,26 @@ func TestStreamingStopsWhenContextCancelled(t *testing.T) {
 		t.Errorf("expected at least 2 packets sent, got %d", sender.SentCount())
 	}
 }
+
+func TestSendTelemetrySkipsUntilGatewayIsDiscovered(t *testing.T) {
+	// Arrange
+	sender := &FakeUDPSender{}
+	unit, err := pdu.NewPDU(pdu.Config{DeviceID: "pdu-rack-07"}, sender)
+	if err != nil {
+		t.Fatalf("unexpected NewPDU error: %v", err)
+	}
+
+	// Act
+	err = unit.SendTelemetry()
+
+	// Assert
+	if err != nil {
+		t.Fatalf("expected no error before discovery, got %v", err)
+	}
+	if host, port := unit.GatewayEndpoint(); host != "" || port != 0 {
+		t.Errorf("expected unknown gateway, got %s:%d", host, port)
+	}
+	if len(sender.Packets) != 0 {
+		t.Errorf("expected no datagrams before discovery, got %d", len(sender.Packets))
+	}
+}

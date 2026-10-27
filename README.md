@@ -1,32 +1,26 @@
-# DataMesh DCIM — Gestão de Ambiente Inteligente em Data Center
+# DataMesh DCIM
 
-**Monitoramento Térmico, Telemetria Elétrica e Controle de Climatização Distribuído em Tempo Real**
+O DataMesh DCIM monitora racks de um data center e controla o ar-condicionado que os resfria. DCIM é a sigla de *Data Center Infrastructure Management*, o nome dado a sistemas que acompanham energia e climatização de um data center.
 
-Projeto prático desenvolvido para a disciplina de **Sistemas Distribuídos / Distribuição de Processos e Dados** (Universidade Federal do Ceará — UFC, Prof. Dr. Paulo A. L. Rego). O **DataMesh DCIM** (*Data Center Infrastructure Management*) instancia uma arquitetura distribuída heterogênea (Python e Go) voltada à supervisão contínua de racks de servidores, detecção imediata de anomalias térmicas, agregação analítica de séries temporais em SQLite e atuação remota em equipamentos de climatização de precisão utilizando **Sockets TCP/UDP**, **UDP Multicast**, **Protocol Buffers (v3)** e **gRPC**.
+O projeto é o Trabalho 1 da disciplina Sistemas Distribuídos / Distribuição de Processos e Dados (UFC, Prof. Dr. Paulo A. L. Rego). Ele usa sockets TCP e UDP, UDP multicast, Protocol Buffers e gRPC, com processos escritos em Python e em Go.
 
-### Membros da Equipe
+### Equipe
 
-- **Antonio Gabriel Carmo Rego** — Matrícula: `539628`
-- **Lucas Lopes de Sousa** — Matrícula: `537512`
+- Antonio Gabriel Carmo Rego, matrícula `539628`
+- Lucas Lopes de Sousa, matrícula `537512`
 
 ### Sumário
 
 - [1. Arquitetura](#1-arquitetura)
 - [2. Módulos](#2-módulos)
-  - [Contrato Protocol Buffers e Framing TCP (`proto/` & `common/`)](#21-contrato-protocol-buffers-e-framing-tcp-proto--common)
-  - [Gateway Central (`gateway/`)](#22-gateway-central-gateway)
-  - [Ar-Condicionado de Precisão (`sources/ac/`)](#23-ar-condicionado-de-precisão-sourcesac)
-  - [Sensor de Temperatura de Rack (`sources/temperature/`)](#24-sensor-de-temperatura-de-rack-sourcestemperature)
-  - [PDU de Rack em Go (`sources/pdu/`)](#25-pdu-de-rack-em-go-sourcespdu)
-  - [Cliente Web e Dashboard (`client/`)](#26-cliente-web-e-dashboard-client)
-- [3. Execução e Demonstração](#3-execução-e-demonstração)
-- [4. Verificação, Testes e Qualidade](#4-verificação-testes-e-qualidade)
+- [3. Como rodar](#3-como-rodar)
+- [4. Testes e qualidade](#4-testes-e-qualidade)
 
 ---
 
 # 1. Arquitetura
 
-O sistema é dividido em três camadas estritamente desacopladas (**Fontes de Dados**, **Gateway Central** e **Cliente**), onde **100% do tráfego de rede é tipado e serializado via Protocol Buffers**:
+O sistema tem três partes que rodam em processos separados. As fontes de dados simulam equipamentos, o Gateway concentra tudo e o Cliente mostra os dados ao usuário. Todas as mensagens trocadas pela rede são serializadas com Protocol Buffers, um formato binário definido no arquivo `proto/datamesh.proto`.
 
 ```mermaid
 flowchart TD
@@ -72,146 +66,143 @@ flowchart TD
     DASH <==>|"Interface Web"| BROWSER
 ```
 
-### Protocolos e Padrões Adotados
+### Protocolos
 
-- **UDP Multicast (`239.255.0.1:9999`):** O Gateway emite periodicamente beacons `DiscoveryRequest` contendo seu IP e porta de ingestão UDP; as fontes ativas respondem anunciando seu `DeviceInfo` (ID, tipo, IP, porta gRPC e estado inicial).
-- **UDP Unicast (`:9998`):** Transporte leve e de baixa sobrecarga para o envio periódico de pacotes `TelemetryPacket` e disparos prioritários orientados a eventos (anomalias térmicas `> 35 °C`).
-- **gRPC (`:50051`):** Invocação remota de procedimentos (`AirConditionerService.SetControl`) do Gateway para os atuadores de climatização.
-- **TCP com Framing *Length-Prefixed* (`:9997`):** Toda comunicação entre o processo Cliente e o Gateway ocorre sobre sockets TCP puros com cabeçalho explícito de 4 bytes (`uint32` *big-endian*) indicando o tamanho exato do payload Protobuf (`ClientRequest` / `ClientResponse`).
+- UDP multicast (`239.255.0.1:9999`). Ao iniciar, e depois a cada 5 s, o Gateway envia um `DiscoveryRequest` com seu IP e a porta UDP de telemetria. Cada fonte responde com um `DeviceInfo`, que traz ID, tipo, IP, porta gRPC e estado inicial. As fontes só começam a mandar telemetria depois de receber esse pedido.
+- UDP unicast (`:9998`). As fontes mandam pacotes `TelemetryPacket` periódicos. O sensor de temperatura também manda um pacote na hora quando passa de 35 °C.
+- gRPC (`:50051`). O Gateway chama `AirConditionerService.SetControl` para mudar o estado do ar-condicionado. A resposta traz o estado atualizado da fonte.
+- TCP (`:9997`). O Cliente e o Gateway trocam `ClientRequest` e `ClientResponse`. Antes de cada mensagem vão 4 bytes (`uint32` *big-endian*) com o tamanho dela. Isso é preciso porque o TCP entrega um fluxo de bytes sem separar as mensagens.
 
 ---
 
 # 2. Módulos
 
-## Sobre os Módulos
+### 2.1. Contrato e framing (`proto/` e `common/`)
 
-### 2.1. Contrato Protocol Buffers e Framing TCP (`proto/` & `common/`)
->
-> Define a linguagem única de comunicação entre os processos em Python e Go, utiliza união polimórfica (`oneof`) para telemetrias heterogêneas e implementa a delimitação segura de mensagens em fluxos TCP.
+O arquivo `proto/datamesh.proto` define todas as mensagens e o serviço gRPC num só lugar, para o Python e o Go usarem o mesmo contrato.
 
-- **`proto/datamesh.proto`:** Centraliza todas as mensagens e enums do domínio:
-  - *Descoberta e Topologia:* `DiscoveryRequest`, `DeviceInfo` e enum `DeviceType` (`TEMPERATURE_SENSOR`, `RACK_PDU`, `AIR_CONDITIONER`).
-  - *Telemetria com `oneof payload`:* O pacote unificado `TelemetryPacket` contém os metadados comuns (`device_id`, `device_type`, `timestamp_ms`, `is_alert`) e encapsula polimorficamente o payload específico de cada dispositivo via `oneof payload`:
-    - `TemperatureTelemetry`: leitura de temperatura em graus Celsius (`temperature_c`).
-    - `ACTelemetry`: leituras térmicas e operacionais (`temperature_c`, `target_temp_c`, `fan_speed_pct`, `power_watts`, `current_amps`, `voltage_volts`, `ac_power_on`).
-    - `PDUTelemetry`: leituras elétricas do rack (`power_watts`, `current_amps`, `voltage_volts`).
-    *Vantagem arquitetural:* elimina campos nulos ou ambíguos na serialização, garantindo tipagem estrita tanto em Python quanto em Go.
-  - *Controle gRPC:* Serviço `AirConditionerService` com RPC `SetControl(ACControlRequest) returns (ACControlResponse)`.
-  - *Sessão Cliente-Gateway e Analytics:* `ClientRequest`, `ClientResponse`, `AnalyticsResult` e os 3 tipos de consulta `AnalyticsQueryType` (`HOTTEST_RACK`, `AVG_PDU_POWER`, `THERMAL_STABILITY`).
-- **`common/framing.py`:** Implementa `send_proto` e `recv_proto` utilizando `struct.pack(">I", length)` (4 bytes *big-endian*) e leitura exata de buffer (`_recv_exact`), prevenindo fragmentação ou concatenação de pacotes em streams TCP.
+- A descoberta usa `DiscoveryRequest`, `DeviceInfo` e `DeviceType` (`TEMPERATURE_SENSOR`, `RACK_PDU`, `AIR_CONDITIONER`).
+- A telemetria usa `TelemetryPacket`. Ele traz os campos comuns (`device_id`, `device_type`, `timestamp_ms` e a marca de alerta `is_alert`) e um `oneof payload` com os dados de cada tipo de fonte. O `oneof` do Protobuf guarda só um dos campos por vez, então cada pacote leva apenas os dados da fonte que o enviou.
+  - `TemperatureTelemetry` tem a temperatura (`temperature_c`).
+  - `ACTelemetry` tem `temperature_c`, `target_temp_c`, `fan_speed_pct`, `power_watts`, `current_amps`, `voltage_volts` e `ac_power_on`.
+  - `PDUTelemetry` tem `power_watts`, `current_amps` e `voltage_volts`.
+- O controle usa o serviço `AirConditionerService`, com `SetControl(ACControlRequest) returns (ACControlResponse)`.
+- O Cliente usa `ClientRequest`, `ClientResponse` e `AnalyticsResult`. As consultas são `HOTTEST_RACK`, `AVG_PDU_POWER` e `THERMAL_STABILITY`.
 
-### 2.2. Gateway Central (`gateway/`)
->
-> Atua como ponto central de coordenação, registro de estado de dispositivos, persistência histórica e roteamento de comandos.
+O `common/framing.py` envia e lê mensagens no TCP com `send_proto` e `recv_proto`. A leitura usa `recv_exact` para juntar os pedaços até completar o tamanho anunciado no cabeçalho.
 
-- **Registro de Dispositivos e Falha Passiva (`gateway/registry.py`):** Mantém o estado em memória (`DeviceRegistry`) thread-safe. Calcula dinamicamente `is_online` comparando o timestamp atual com `last_seen_ms`: caso uma fonte fique **mais de 15 segundos** (`OFFLINE_THRESHOLD_MS = 15_000`) sem enviar pacotes UDP, é marcada automaticamente como `OFFLINE`.
-- **Persistência SQLite e Motor Analítico (`gateway/storage/`):** Armazena séries temporais em SQLite com modo **WAL (`PRAGMA journal_mode=WAL`)** habilitado para leitura e escrita concorrentes. Executa diretamente via SQL as 3 consultas agregadas em janela deslizante:
-  1. `HOTTEST_RACK`: Identifica o sensor de rack com o maior pico térmico registrado no período (`MAX(temperature_c)`).
-  2. `AVG_PDU_POWER`: Calcula o consumo médio de potência ativa em Watts das PDUs (`AVG(power_watts)`).
-  3. `THERMAL_STABILITY`: Calcula a média e o desvio padrão populacional das temperaturas dos racks para medir a estabilidade térmica do ambiente.
-- **Coordenador e Proxy gRPC (`gateway/service.py` & `gateway/proxy.py`):** Gerencia em threads dedicadas o listener UDP de ingestão, o emissor de beacons UDP Multicast, o servidor TCP multi-cliente e o stub gRPC (`GrpcACControlProxy`) para repassar atuações ao Ar-Condicionado.
+### 2.2. Gateway (`gateway/`)
 
-### 2.3. Ar-Condicionado de Precisão (`sources/ac/`)
->
-> Fonte **controlável** em Python que combina atuação via servidor gRPC e telemetria contínua via UDP.
+O Gateway registra as fontes, guarda as leituras e repassa comandos.
 
-- **`sources/ac/actuator.py`:** Levanta um servidor gRPC (`AirConditionerServicer`) na porta `:50051` que processa comandos `SetControl` alterando atomicamente estado de energia (`power_on`), temperatura alvo (`target_temp_c`) e rotação da ventoinha (`fan_speed_pct`).
-- Simula a convergência térmica gradual do ambiente em direção ao *setpoint* configurado (ou deriva para a temperatura ambiente quando desligado) e calcula o consumo elétrico proporcional à velocidade dos ventiladores.
-- Escuta beacons no grupo multicast `239.255.0.1:9999` (com `SO_REUSEADDR`/`SO_REUSEPORT`) e transmite periodicamente seu estado via UDP ao Gateway.
+- `gateway/registry.py` mantém em memória a lista de fontes. Uma fonte que fica mais de 15 s (`OFFLINE_THRESHOLD_MS`) sem mandar pacotes aparece como `OFFLINE`. Quando o anúncio chega sem IP, o Gateway usa o endereço de onde o pacote veio.
+- `gateway/storage/` guarda as leituras em SQLite, no modo WAL, que deixa ler e escrever ao mesmo tempo. Ali ficam as 3 consultas, todas sobre uma janela de tempo escolhida pelo usuário.
+  1. `HOTTEST_RACK` devolve o sensor com a maior temperatura registrada.
+  2. `AVG_PDU_POWER` devolve a potência média das PDUs em watts.
+  3. `THERMAL_STABILITY` devolve a média e o desvio padrão das temperaturas dos racks.
+- `gateway/service.py` cuida das threads de UDP, dos pedidos de descoberta e do servidor TCP. O `gateway/proxy.py` tem o cliente gRPC (`GrpcACControlProxy`) que fala com o ar-condicionado.
 
-### 2.4. Sensor de Temperatura de Rack (`sources/temperature/`)
->
-> Fonte **orientada a eventos** em Python com telemetria periódica e disparo imediato de anomalias térmicas (`> 35 °C`).
+### 2.3. Ar-condicionado de precisão (`sources/ac/`)
 
-- **`sources/temperature/sensor.py`:** Permite configurar a temperatura base nominal de cada rack (`BASE_TEMP_C`) e envia leituras periódicas via UDP unicast.
-- **Disparo Imediato de Evento Crítico:** Ao receber um gatilho (via tecla `[ENTER]` no terminal ou sinal `SIGUSR1` enviado pelo console da demonstração), invoca `trigger_anomaly(temp_c=38.8)` — transmitindo **imediatamente** um pacote UDP com `is_alert=True` sem aguardar o temporizador periódico. O rack permanece quente por um platô (`ANOMALY_HOLD_SEC`, padrão 20 s) para visualização clara no Dashboard e depois resfria exponencialmente até a temperatura base (`ANOMALY_DECAY_SEC`, padrão 10 s); o alerta só é desligado abaixo de 33 °C (histerese) para não oscilar em torno do limiar.
+É a fonte controlável. O `sources/ac/actuator.py` sobe um servidor gRPC na porta 50051. O comando `SetControl` muda o estado de energia (`power_on`), a temperatura alvo (`target_temp_c`) e a velocidade do ventilador (`fan_speed_pct`).
 
-### 2.5. PDU de Rack em Go (`sources/pdu/`)
->
-> Fonte **contínua** implementada em **Go** para demonstrar interoperabilidade multi-linguagem via Protocol Buffers.
+A simulação aproxima aos poucos a temperatura da sala do *setpoint*. Desligado, o aparelho deixa a sala voltar à temperatura ambiente. O consumo elétrico acompanha a velocidade do ventilador.
 
-- **`sources/pdu/pdu.go` & `cmd/main.go`:** Compilado como binário nativo em Go utilizando os pacotes gerados em `gen/go`.
-- Participa da descoberta UDP Multicast (`net.ListenMulticastUDP`) aprendendo dinamicamente o endereço do Gateway e emite continuamente leituras de potência ativa (`Watts`), corrente (`Amperes`) e tensão (`Volts`) serializadas em Protobuf via UDP.
+### 2.4. Sensor de temperatura de rack (`sources/temperature/`)
 
-### 2.6. Cliente Web e Dashboard (`client/`)
->
-> Processo independente em Python (`FastAPI`) que atua como adaptador entre o navegador e o socket TCP do Gateway.
+É a fonte que manda dados na hora quando acontece um evento. O `sources/temperature/sensor.py` envia leituras periódicas em torno da temperatura base do rack (`BASE_TEMP_C`).
 
-- **`client/gateway_client.py` (`TCPGatewayClient`):** Realiza todas as operações (`list_devices`, `get_history`, `control_ac`, `query_analytics`) abrindo conexões TCP com framing Protobuf de 4 bytes contra o Gateway (`:9997`). O Cliente Web **nunca** acessa o banco SQLite nem se comunica diretamente com as fontes.
-- **`client/static/index.html`:** Dashboard single-page com `Chart.js` e atualização automática a cada 2s:
-  - Agrupa os dispositivos conectados em **3 categorias visuais** (*Climatização AC*, *Sensores Térmicos de Rack* e *PDUs de Rack*).
-  - Destaca imediatamente em vermelho (`🔥 ALERTA (>35°C)`) sensores em estado de anomalia térmica e sinaliza fontes inativas (`OFFLINE (>15s)`).
-  - Exibe gráficos em tempo real de séries temporais térmicas e elétricas, painel de controle gRPC do AC e execução interativa das 3 consultas analíticas.
-- **`client/events.py` & `client/static/events.html` (`/events`):** Linha do tempo de eventos com filtros por categoria — fontes registradas no Gateway, transições `ONLINE`/`OFFLINE`, início e fim de alertas térmicos (com o timestamp do próprio pacote), comandos gRPC enviados ao AC e consultas analíticas executadas. Os eventos são detectados no processo do Cliente por uma thread que consulta o Gateway via TCP a cada 1s, então o histórico cobre toda a demonstração mesmo que a página seja aberta depois.
+A anomalia é disparada com `ENTER` no terminal do sensor ou com o sinal `SIGUSR1`, que o console da demonstração usa. O sensor chama `trigger_anomaly(temp_c=38.8)` e manda na hora um pacote com `is_alert=True`, sem esperar o próximo envio periódico. O rack fica quente por 20 s (`ANOMALY_HOLD_SEC`) e depois esfria aos poucos (`ANOMALY_DECAY_SEC`, 10 s). O alerta só termina abaixo de 33 °C, para não ligar e desligar quando a leitura oscila perto de 35 °C.
+
+### 2.5. PDU de rack em Go (`sources/pdu/`)
+
+A PDU é a unidade que distribui energia aos servidores do rack. Aqui ela é a fonte contínua, escrita em Go para usar o mesmo contrato Protobuf em outra linguagem. O `sources/pdu/pdu.go` usa o código gerado em `gen/go`. A PDU escuta o multicast com `net.ListenMulticastUDP`, aprende o endereço do Gateway e manda potência (W), corrente (A) e tensão (V) por UDP.
+
+### 2.6. Cliente web (`client/`)
+
+O Cliente é um processo Python com FastAPI. O navegador fala HTTP com ele, e ele fala com o Gateway por TCP. Ele nunca acessa o SQLite nem as fontes.
+
+- `client/gateway_client.py` (`TCPGatewayClient`) faz as quatro operações (`list_devices`, `get_history`, `control_ac` e `query_analytics`), cada uma numa conexão TCP com o Gateway na porta 9997.
+- `client/static/index.html` é o dashboard, atualizado a cada 2 s. Ele agrupa as fontes por tipo, destaca em vermelho os sensores em alerta e marca as fontes paradas como `OFFLINE`. Também mostra os gráficos, o painel de controle do ar-condicionado e as 3 consultas.
+- `client/events.py` e `client/static/events.html` formam a página `/events`, uma linha do tempo do sistema. Ela mostra a entrada de fontes, as mudanças entre `ONLINE` e `OFFLINE` e o início e o fim dos alertas. Também mostra os comandos enviados ao ar-condicionado e as consultas executadas. Uma thread do Cliente consulta o Gateway a cada 1 s, então a lista cobre a demonstração inteira mesmo que a página seja aberta depois.
 
 ---
 
-# 3. Execução e Demonstração
+# 3. Como rodar
 
 ### Pré-requisitos
 
-- **Python 3.12+** (gerenciado via `uv`) e **Go 1.23+** (gerenciado via `mise`).
-- Instalar dependências (caso necessário):
+O projeto usa Python 3.12+ (gerenciado pelo `uv`) e Go 1.23+ (gerenciado pelo `mise`). Este comando instala as ferramentas e as dependências.
 
-  ```bash
-  mise install && uv sync
-  ```
+```bash
+mise install && uv sync
+```
 
-### Opção A — Console Interativo de Demonstração (Recomendado)
+### Console de demonstração
 
-O script [scripts/run_demo.sh](file:///home/gabrigas/Selene/UFC/sistemas%20distribuidos/1%20-%20atividades/datamesh/scripts/run_demo.sh) compila o binário Go da PDU, sobe o Gateway, o Cliente Web (`http://localhost:8080`) e uma topologia **multi-rack** inicial com codinomes estilo Docker (`ac-01-carnot`, `temp-01-turing`, `temp-02-curie`, `pdu-01-tesla`, `pdu-02-faraday`), exibindo um menu interativo no terminal:
+O script `scripts/run_demo.sh` compila a PDU, sobe o Gateway e o Cliente Web (`http://localhost:8080`) e inicia cinco fontes (`ac-01-carnot`, `temp-01-turing`, `temp-02-curie`, `pdu-01-tesla` e `pdu-02-faraday`). As fontes sobem sem o endereço do Gateway e aparecem no dashboard depois do primeiro pedido de descoberta, em até 5 s.
 
 ```bash
 ./scripts/run_demo.sh
-# ou via Taskfile:
+# ou pelo Taskfile
 mise exec -- task demo
 ```
 
-Ações disponíveis no console interativo durante a demonstração:
+O menu do console tem estas opções.
 
-- **`[1]` 🔥 Disparar anomalia térmica imediata (`> 35°C`):** permite escolher qualquer sensor térmico ativo para disparar instantaneamente um alerta crítico (`38.8 °C [ALERTA]`) ao Gateway.
-- **`[2]` ➕ Adicionar novo sensor/PDU ao vivo:** instancia novos processos em tempo de execução com codinomes autogerados estilo Docker (ex.: `temp-03-frosty-fermi`, `pdu-03-amber-lovelace`), demonstrando a entrada dinâmica de fontes no Dashboard.
-- **`[3]` 💥 Simular falha/desligamento de uma fonte (`ONLINE -> OFFLINE`):** encerra o processo da fonte escolhida; após 15 segundos sem telemetria UDP, o Gateway altera seu estado para `OFFLINE (>15s)`.
-- **`[4]` 🔄 Religar/recuperar uma fonte parada (`OFFLINE -> ONLINE`):** reinicia uma fonte previamente derrubada, restabelecendo o fluxo UDP e o status `ONLINE`.
-- **`[5]` 📊 Listar estado atual dos processos da Demo.**
-- **`[6]` 📜 Exibir últimas 15 linhas de log (`/tmp/datamesh-demo.log`).**
-- **`[q]` 🚪 Encerrar demonstração:** finaliza todos os processos filhos e limpa arquivos temporários.
+- `[1]` dispara uma anomalia num sensor escolhido, que manda na hora um alerta de 38,8 °C.
+- `[2]` inicia um sensor ou uma PDU nova, com nome gerado (por exemplo `temp-03-frosty-fermi`). Ela entra no sistema pela descoberta.
+- `[3]` encerra uma fonte para simular falha. Depois de 15 s sem telemetria, o Gateway a marca como `OFFLINE`.
+- `[4]` religa uma fonte parada, que volta a `ONLINE`.
+- `[5]` mostra o estado dos processos.
+- `[6]` mostra as últimas 15 linhas do log (`/tmp/datamesh-demo.log`).
+- `[q]` encerra todos os processos.
 
-### Opção B — Execução Manual em Terminais Separados
+### Um processo por terminal
 
 ```bash
-# Terminal 1 — Gateway Central (TCP :9997, UDP :9998, Multicast 239.255.0.1:9999)
+# Terminal 1: Gateway (TCP :9997, UDP :9998, multicast 239.255.0.1:9999)
 uv run python -m gateway.main
 
-# Terminal 2 — Ar-Condicionado de Precisão (Servidor gRPC :50051 + Telemetria UDP)
+# Terminal 2: ar-condicionado (gRPC :50051)
 uv run python -m sources.ac.main
 
-# Terminal 3 — Sensor de Temperatura de Rack (Pressione [ENTER] para disparar > 35°C)
+# Terminal 3: sensor de temperatura (ENTER dispara a anomalia)
 uv run python -m sources.temperature.main
 
-# Terminal 4 — PDU de Rack (Go)
+# Terminal 4: PDU em Go
 mise exec -- go run ./sources/pdu/cmd/main.go
 
-# Terminal 5 — Cliente Web (Dashboard em http://localhost:8080)
+# Terminal 5: Cliente Web (http://localhost:8080)
 uv run python -m client.main
 ```
 
----
+### Rodando em mais de uma máquina
 
-# 4. Verificação, Testes e Qualidade
-
-O projeto conta com suíte automatizada de testes unitários e de integração ponta a ponta (93 testes Python com requisito mínimo de **80% de cobertura**, atingindo **88.42%**, e 10 testes Go), além de checagem estrita de tipos (`ty` da Astral e `go vet`) e formatação (`ruff` e `gofmt`):
+Por padrão o Gateway anuncia o endereço `127.0.0.1`, que só funciona quando tudo roda na mesma máquina. Para fontes em outras máquinas da rede, informe o IP do Gateway que elas devem usar.
 
 ```bash
-# Executar pipeline completo de validação (proto -> lint -> typecheck -> tests)
+GATEWAY_ADVERTISED_IP=192.168.0.10 uv run python -m gateway.main
+```
+
+O ar-condicionado não precisa de configuração, porque o Gateway usa o endereço de origem do anúncio para chamar o gRPC. Se ele estiver atrás de NAT ou tiver mais de uma interface, defina `AC_ADVERTISED_IP`. Para pular a descoberta e fixar o Gateway numa fonte, defina `GATEWAY_HOST` e `GATEWAY_PORT`.
+
+---
+
+# 4. Testes e qualidade
+
+Os testes Python usam `pytest` e exigem no mínimo 80% de cobertura. A PDU tem testes em Go. O `ruff` confere estilo e formatação, o `ty` confere os tipos do Python e o `go vet` analisa o código Go.
+
+```bash
+# Gera o código do proto, roda lint, checagem de tipos e todos os testes
 mise exec -- task check
 
-# Executar apenas a suíte Python com relatório de cobertura (93 testes, 88.42% coverage)
+# Só os testes Python, com relatório de cobertura
 uv run pytest
 
-# Executar apenas a suíte de testes Go da PDU (10 testes)
+# Só os testes Go da PDU
 mise exec -- go test -v ./sources/pdu/...
 
-# Executar Smoke Test automatizado ponta a ponta (sobe todos os processos, testa gRPC/Analytics e encerra)
+# Sobe todos os processos, testa descoberta, gRPC e consultas, e encerra
 ./scripts/run_demo.sh --smoke
 ```

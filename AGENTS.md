@@ -7,7 +7,7 @@
 
 ## Tech Stack
 
-- Linguagens: Python 3.12+ (gerenciado via `uv`) e Go 1.22+ (gerenciado via `mise`).
+- Linguagens: Python 3.12+ (gerenciado via `uv`) e Go 1.23+ (gerenciado via `mise`).
 - Interface Web (Cliente): `FastAPI` + `uvicorn` no backend do Cliente e página single-page com `Chart.js` para visualização de séries temporais.
 - Serialização & RPC: Protocol Buffers v3 (`protoc` 36+) e gRPC.
 - Rede e Transporte:
@@ -16,7 +16,6 @@
   - TCP (com framing length-prefixed: 4 bytes big-endian + payload Protobuf) entre Cliente e Gateway.
   - gRPC entre Gateway e fontes atuadoras (Ar-Condicionado de Precisão).
 - Persistência: SQLite local no Gateway para armazenamento de séries temporais e suporte a consultas analíticas agregadas.
-- Orquestração & Containers: Docker e Docker Compose (com `network_mode: host` para suporte nativo a UDP Multicast).
 - Automação: `Taskfile.yml` / `mise` / `uv`.
 
 ## File Structure
@@ -37,8 +36,6 @@ docs/, proto/, gen/, gateway/, sources/, client/, scripts/
 
 - Gerar código Protobuf (Python & Go):
   `mise exec -- task proto` ou `./scripts/build_protos.sh`
-- Subir ambiente com Docker Compose:
-  `docker compose up --build`
 - Executar Gateway localmente:
   `uv run python -m gateway.main`
 - Executar Fontes localmente:
@@ -59,8 +56,6 @@ docs/, proto/, gen/, gateway/, sources/, client/, scripts/
 - Ferramentas locais gerenciadas pelo `mise`: `uv`, `go`, `task`, `protoc`, `protoc-gen-go` (e opcionalmente `ty`).
 - Instalar dependências da toolchain:
   `mise install`
-- Suporte a Docker & Compose: Docker Engine instalado localmente com suporte a `docker compose` (opcional após validação local do MVP).
-  - Nota de rede: os serviços usam `network_mode: host` para garantir que pacotes de descoberta UDP Multicast transitem sem bloqueios de bridge.
 
 ## Code Quality
 
@@ -75,13 +70,14 @@ docs/, proto/, gen/, gateway/, sources/, client/, scripts/
 - Gateway é o intermediário único para clientes: o Cliente Web nunca conversa diretamente com as Fontes nem acessa o SQLite; o navegador fala HTTP com o processo `client/`, e o `client/` fala exclusivamente via socket TCP (framing Protobuf) com o Gateway.
 - Framing TCP obrigatório: delimitação explícita por tamanho do payload (`uint32` big-endian).
 - Fontes são processos desacoplados com resiliência a falhas e reconexão.
+- Fontes sobem sem endereço do Gateway e só transmitem depois do primeiro `DiscoveryRequest`. `GATEWAY_HOST` fixa um endereço e pula essa espera.
+- O Gateway anuncia `127.0.0.1` por padrão. Com fontes em outras máquinas, defina `GATEWAY_ADVERTISED_IP`.
 - Detecção de falha passiva no Gateway: baseada no timestamp `last_seen` dos pacotes UDP de cada fonte (`> 15s` sem telemetria marca a fonte como `OFFLINE`).
 - Simulação de anomalia sob demanda: `sources/temperature` permite gatilho interativo no terminal para disparar leitura `> 35°C` imediatamente via UDP.
 - O banco SQLite reside exclusivamente no Gateway e armazena leituras com timestamp, device_id e valores métricos normalizados.
 
 ## Known Gotchas
 
-- UDP Multicast no Docker: pontes padrão (`bridge`) podem descartar pacotes IGMP/multicast sem configuração explícita; `network_mode: host` é a abordagem recomendada no Linux.
 - Diretório `gen/`: nunca editar manualmente os arquivos gerados pelo `protoc`.
 - Sockets TCP: streaming contínuo exige sempre leitura do cabeçalho de 4 bytes de comprimento para ler exatamente o tamanho do frame Protobuf.
 

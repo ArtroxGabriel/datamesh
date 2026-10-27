@@ -17,6 +17,11 @@ export DB_PATH="${DB_PATH:-/tmp/datamesh-demo.db}"
 LOG_FILE="/tmp/datamesh-demo.log"
 PYTHON_BIN="${ROOT_DIR}/.venv/bin/python"
 
+if [[ ! -x "$PYTHON_BIN" ]]; then
+    echo "[DEMO] Ambiente Python não encontrado em ${ROOT_DIR}/.venv. Rode 'uv sync' antes."
+    exit 1
+fi
+
 rm -f "${DB_PATH}" "${DB_PATH}-wal" "${DB_PATH}-shm" "${LOG_FILE}"
 
 CORE_PIDS=()
@@ -51,6 +56,7 @@ cleanup() {
     echo ""
     echo "[DEMO] Encerrando processos do DataMesh DCIM..."
     for id in "${SOURCE_ORDER[@]:-}"; do
+        [[ -n "$id" ]] || continue
         pid="${SOURCE_PIDS[$id]:-}"
         if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
             kill -TERM "$pid" 2>/dev/null || true
@@ -87,27 +93,21 @@ register_source() {
 
 start_source() {
     local id="$1"
-    local discovery_only="${2:-false}"
     local type="${SOURCE_TYPES[$id]}"
     local param="${SOURCE_PARAMS[$id]}"
 
-    local gw_host="${GATEWAY_HOST}"
-    local gw_port="${TELEMETRY_UDP_PORT}"
-    if [[ "$discovery_only" == "true" ]]; then
-        gw_host=""
-        gw_port="0"
-    fi
-
+    # Fontes sobem sem endereço do Gateway e só transmitem depois de receber o pedido de
+    # descoberta multicast, que o Gateway repete a cada 5 s.
     if [[ "$type" == "temp" ]]; then
-        SENSOR_ID="$id" BASE_TEMP_C="$param" GATEWAY_HOST="$gw_host" GATEWAY_PORT="$gw_port" \
+        SENSOR_ID="$id" BASE_TEMP_C="$param" GATEWAY_HOST="" \
             "$PYTHON_BIN" -m sources.temperature.main </dev/null >>"$LOG_FILE" 2>&1 &
         SOURCE_PIDS["$id"]=$!
     elif [[ "$type" == "pdu" ]]; then
-        PDU_DEVICE_ID="$id" BASE_POWER_WATTS="$param" GATEWAY_HOST="${GATEWAY_HOST}" GATEWAY_PORT="${TELEMETRY_UDP_PORT}" \
+        PDU_DEVICE_ID="$id" BASE_POWER_WATTS="$param" GATEWAY_HOST="" \
             /tmp/datamesh-pdu >>"$LOG_FILE" 2>&1 &
         SOURCE_PIDS["$id"]=$!
     elif [[ "$type" == "ac" ]]; then
-        AC_DEVICE_ID="$id" AC_GRPC_PORT="$param" GATEWAY_HOST="${GATEWAY_HOST}" GATEWAY_PORT="${TELEMETRY_UDP_PORT}" \
+        AC_DEVICE_ID="$id" AC_GRPC_PORT="$param" GATEWAY_HOST="" \
             "$PYTHON_BIN" -m sources.ac.main >>"$LOG_FILE" 2>&1 &
         SOURCE_PIDS["$id"]=$!
     fi
@@ -131,6 +131,28 @@ echo "[DEMO] Iniciando Cliente Web FastAPI em http://localhost:${WEB_PORT} ..."
 GATEWAY_PORT="${GATEWAY_TCP_PORT}" "$PYTHON_BIN" -m client.main >>"$LOG_FILE" 2>&1 &
 CORE_PIDS+=($!)
 
+# Sem esta espera, uma falha do Gateway ou do Cliente ficaria só no log e o menu abriria
+# com o dashboard fora do ar.
+wait_for_dashboard() {
+    for _ in {1..30}; do
+        for pid in "${CORE_PIDS[@]}"; do
+            kill -0 "$pid" 2>/dev/null || return 1
+        done
+        if (exec 3<>"/dev/tcp/127.0.0.1/${WEB_PORT}") 2>/dev/null; then
+            return 0
+        fi
+        sleep 0.5
+    done
+    return 1
+}
+
+if ! wait_for_dashboard; then
+    echo "[DEMO] O Gateway ou o Cliente Web não subiu. Últimas linhas do log (${LOG_FILE}):"
+    tail -n 20 "$LOG_FILE" || true
+    exit 1
+fi
+echo "[DEMO] Dashboard no ar em http://localhost:${WEB_PORT}"
+
 # Registra e inicia topologia inicial multi-rack com codinomes estilo Docker
 register_source "ac-01-carnot" "ac" "50051"
 register_source "temp-01-turing" "temp" "22.5"
@@ -139,12 +161,13 @@ register_source "pdu-01-tesla" "pdu" "1400"
 register_source "pdu-02-faraday" "pdu" "1850"
 
 for id in "${SOURCE_ORDER[@]}"; do
-    start_source "$id" "false"
+    start_source "$id"
 done
 sleep 0.5
 
 if [[ "${1:-}" == "--smoke" ]]; then
-    echo "[DEMO] Aguardando ingestão de telemetria da topologia multi-rack..."
+    echo "[DEMO] Aguardando a descoberta das 5 fontes..."
+    found=0
     for _ in {1..30}; do
         devs="$(curl -fsS "http://127.0.0.1:${WEB_PORT}/api/devices" 2>/dev/null || true)"
         if echo "$devs" | grep -q "pdu-01-tesla" && \
@@ -152,12 +175,20 @@ if [[ "${1:-}" == "--smoke" ]]; then
            echo "$devs" | grep -q "temp-01-turing" && \
            echo "$devs" | grep -q "temp-02-curie" && \
            echo "$devs" | grep -q "ac-01-carnot"; then
+            found=1
             break
         fi
         sleep 0.5
     done
+    if [[ $found -eq 0 ]]; then
+        echo "[DEMO] Falha: nem todas as fontes foram descobertas em 15 s."
+        exit 1
+    fi
+    # As fontes só começam a transmitir depois da descoberta. Espera um ciclo de envio
+    # para as consultas já encontrarem leituras.
+    sleep "$(awk "BEGIN { print ${SEND_INTERVAL_SEC} + 1 }")"
 
-    echo "[DEMO] Disparando anomalia (>35°C) via SIGUSR1 em temp-02-curie..."
+    echo "[DEMO] Disparando anomalia (acima de 35 °C) via SIGUSR1 em temp-02-curie..."
     kill -USR1 "${SOURCE_PIDS["temp-02-curie"]}"
     sleep 0.5
 
@@ -213,7 +244,7 @@ trigger_anomaly_menu() {
         fi
     done
     if [[ ${#active_temps[@]} -eq 0 ]]; then
-        echo "  ⚠️  Nenhum sensor de temperatura ativo no momento."
+        echo "  Nenhum sensor de temperatura ativo no momento."
         return
     fi
     read -r -p "Escolha o número do sensor [padrão: 1 (${active_temps[0]})]: " choice
@@ -222,9 +253,9 @@ trigger_anomaly_menu() {
     if [[ $sel_idx -ge 0 && $sel_idx -lt ${#active_temps[@]} ]]; then
         local target_id="${active_temps[$sel_idx]}"
         kill -USR1 "${SOURCE_PIDS[$target_id]}"
-        echo "  🔥 Alerta imediato de anomalia (38.8°C > 35.0°C) disparado por ${target_id}!"
+        echo "  ${target_id} enviou alerta imediato de anomalia (38.8 °C, limiar 35 °C)."
     else
-        echo "  ⚠️  Opção inválida."
+        echo "  Opção inválida."
     fi
 }
 
@@ -248,8 +279,8 @@ add_sensor_menu() {
         local base_w=$((1200 + (NEXT_PDU_IDX * 250)))
         NEXT_PDU_IDX=$((NEXT_PDU_IDX + 1))
         register_source "$new_id" "pdu" "$base_w"
-        start_source "$new_id" "false"
-        echo "  ⚡ Nova PDU ${new_id} (${base_w}W) iniciada (PID ${SOURCE_PIDS[$new_id]}) e já visível no Dashboard!"
+        start_source "$new_id"
+        echo "  PDU ${new_id} (${base_w} W) iniciada (PID ${SOURCE_PIDS[$new_id]}). Aparece no Dashboard após o próximo pedido de descoberta (até 5 s)."
     else
         local rack_num
         rack_num=$(printf "%02d" "$NEXT_TEMP_IDX")
@@ -257,9 +288,9 @@ add_sensor_menu() {
         local base_t="24.5"
         NEXT_TEMP_IDX=$((NEXT_TEMP_IDX + 1))
         register_source "$new_id" "temp" "$base_t"
-        start_source "$new_id" "false"
+        start_source "$new_id"
         sleep 0.4
-        echo "  📡 Novo sensor ${new_id} (${base_t}°C) iniciado (PID ${SOURCE_PIDS[$new_id]}) e já visível no Dashboard!"
+        echo "  Sensor ${new_id} (${base_t} °C) iniciado (PID ${SOURCE_PIDS[$new_id]}). Aparece no Dashboard após o próximo pedido de descoberta (até 5 s)."
     fi
 }
 
@@ -276,7 +307,7 @@ stop_source_menu() {
         fi
     done
     if [[ ${#running_ids[@]} -eq 0 ]]; then
-        echo "  ⚠️  Nenhuma fonte em execução."
+        echo "  Nenhuma fonte em execução."
         return
     fi
     read -r -p "Escolha o número da fonte para derrubar [padrão: 1 (${running_ids[0]})]: " choice
@@ -286,9 +317,9 @@ stop_source_menu() {
         local target_id="${running_ids[$sel_idx]}"
         kill -TERM "${SOURCE_PIDS[$target_id]}" 2>/dev/null || true
         wait "${SOURCE_PIDS[$target_id]}" 2>/dev/null || true
-        echo "  💥 Fonte ${target_id} desligada! Em até 15s sem telemetria o Gateway marcará OFFLINE no Dashboard."
+        echo "  Fonte ${target_id} desligada. Depois de 15 s sem telemetria o Gateway a marca como OFFLINE."
     else
-        echo "  ⚠️  Opção inválida."
+        echo "  Opção inválida."
     fi
 }
 
@@ -305,7 +336,7 @@ restart_source_menu() {
         fi
     done
     if [[ ${#stopped_ids[@]} -eq 0 ]]; then
-        echo "  ✅ Todas as fontes já estão ativas!"
+        echo "  Todas as fontes já estão ativas."
         return
     fi
     read -r -p "Escolha o número da fonte para religar [padrão: 1 (${stopped_ids[0]})]: " choice
@@ -313,27 +344,27 @@ restart_source_menu() {
     local sel_idx=$((choice - 1))
     if [[ $sel_idx -ge 0 && $sel_idx -lt ${#stopped_ids[@]} ]]; then
         local target_id="${stopped_ids[$sel_idx]}"
-        start_source "$target_id" "false"
-        echo "  ✅ Fonte ${target_id} religada (PID ${SOURCE_PIDS[$target_id]})! Voltará para ONLINE no Dashboard."
+        start_source "$target_id"
+        echo "  Fonte ${target_id} religada (PID ${SOURCE_PIDS[$target_id]}). Volta a ONLINE após o próximo pedido de descoberta."
     else
-        echo "  ⚠️  Opção inválida."
+        echo "  Opção inválida."
     fi
 }
 
 while true; do
     echo ""
     echo "======================================================================"
-    echo "  🎛️  DATAMESH DCIM — CONSOLE INTERATIVO DE DEMONSTRAÇÃO"
-    echo "  🌐 Dashboard Web: http://localhost:${WEB_PORT}"
-    echo "  📄 Logs em tempo real: tail -f ${LOG_FILE}"
+    echo "  DataMesh DCIM, console de demonstração"
+    echo "  Dashboard: http://localhost:${WEB_PORT}"
+    echo "  Logs: tail -f ${LOG_FILE}"
     echo "======================================================================"
-    echo "  [1] 🔥 Disparar anomalia térmica imediata (> 35°C) em um sensor"
-    echo "  [2] ➕ Adicionar novo sensor/PDU ao vivo (Descoberta Multicast)"
-    echo "  [3] 💥 Simular falha/desligamento de uma fonte (ONLINE -> OFFLINE)"
-    echo "  [4] 🔄 Religar/recuperar uma fonte parada (OFFLINE -> ONLINE)"
-    echo "  [5] 📊 Listar estado atual dos processos da Demo"
-    echo "  [6] 📜 Exibir últimas 15 linhas de log (${LOG_FILE})"
-    echo "  [q] 🚪 Encerrar demonstração"
+    echo "  [1] Disparar anomalia térmica (acima de 35 °C) em um sensor"
+    echo "  [2] Adicionar sensor ou PDU com a demo rodando"
+    echo "  [3] Simular falha de uma fonte (ONLINE para OFFLINE)"
+    echo "  [4] Religar uma fonte parada (OFFLINE para ONLINE)"
+    echo "  [5] Listar o estado dos processos"
+    echo "  [6] Mostrar as últimas 15 linhas do log"
+    echo "  [q] Encerrar a demonstração"
     echo "======================================================================"
     read -r -p "Selecione uma ação: " action || break
     case "$action" in
@@ -344,6 +375,6 @@ while true; do
         5) print_status_table ;;
         6) echo ""; tail -n 15 "$LOG_FILE" || true ;;
         q|Q) break ;;
-        *) echo "  ⚠️  Opção inválida. Use 1-6 ou q." ;;
+        *) echo "  Opção inválida. Use 1 a 6 ou q." ;;
     esac
 done

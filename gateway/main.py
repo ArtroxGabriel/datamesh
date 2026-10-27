@@ -142,6 +142,8 @@ def main() -> None:
     multicast_group = os.getenv("MULTICAST_GROUP", "239.255.0.1")
     multicast_port = int(os.getenv("MULTICAST_PORT", str(DEFAULT_MULTICAST_PORT)))
     db_path = os.getenv("DB_PATH", "datamesh.db")
+    # Address the sources should send telemetry to. Needed when they run on other machines.
+    advertised_ip = os.getenv("GATEWAY_ADVERTISED_IP") or None
 
     app = GatewayApp(
         host=host,
@@ -150,6 +152,7 @@ def main() -> None:
         multicast_group=multicast_group,
         multicast_port=multicast_port,
         db_path=db_path,
+        advertised_ip=advertised_ip,
     )
 
     def _shutdown(_sig: int, _frame: object) -> None:
