@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DataMesh DCIM - Topologia & Comunicações</title>
+  <style>
+    :root {
+      --bg: #edf2f7;
+      --card-bg: #ffffff;
+      --border: #d1d9e6;
+      --border-input: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --primary: #0066cc;
+      --primary-hover: #0052a3;
+      --green: #0a8754;
+      --green-bg: #dcfce7;
+      --red: #dc2626;
+      --red-bg: #fee2e2;
+      --amber: #d97706;
+      --amber-bg: #fef3c7;
+      --purple: #7c3aed;
+      --purple-bg: #f3e8ff;
+      --orange: #ea580c;
+      --orange-bg: #ffedd5;
+      --info-bg: #e0f2fe;
+      --info-text: #0284c7;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding: 1.25rem 2rem 2.5rem 2rem;
+      line-height: 1.4;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.25rem;
+    }
+    .brand { display: flex; align-items: flex-start; gap: 0.75rem; }
+    .badge-dcim {
+      background-color: #0b2545;
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 0.95rem;
+      padding: 0.35rem 0.65rem;
+      border-radius: 6px;
+      letter-spacing: 0.05em;
+      line-height: 1.2;
+      display: inline-flex;
+      align-items: center;
+      height: 28px;
+    }
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--text-main);
+      line-height: 28px;
+      margin: 0;
+    }
+    .brand-subtitle {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      height: 28px;
+    }
+    .nav-link {
+      color: var(--primary);
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-decoration: none;
+      line-height: 28px;
+    }
+    .nav-link:hover { text-decoration: underline; }
+    .status-badge-gateway {
+      background-color: var(--green);
+      color: #ffffff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.35rem 0.85rem;
+      border-radius: 20px;
+      letter-spacing: 0.04em;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      height: 28px;
+    }
+    .status-badge-gateway::before {
+      content: "";
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background-color: #ffffff;
+      border-radius: 50%;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+
+    .legend-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.2rem;
+      align-items: center;
+      font-size: 0.8rem;
+    }
+    .legend-title { font-weight: 700; color: var(--text-main); }
+    .legend-item { display: flex; align-items: center; gap: 0.4rem; font-weight: 500; color: var(--text-muted); }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .dot-purple { background: var(--purple); }
+    .dot-blue { background: #0284c7; }
+    .dot-red { background: var(--red); }
+    .dot-green { background: var(--green); }
+    .dot-orange { background: var(--orange); }
+
+    .canvas-container {
+      position: relative;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 1.25rem;
+      box-shadow: inset 0 0 8px rgba(0,0,0,0.03);
+    }
+    canvas { display: block; width: 100%; height: 460px; }
+    .tooltip-card {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      font-size: 0.8rem;
+      max-width: 300px;
+      display: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      color: var(--text-main);
+    }
+    .tooltip-title { font-weight: 700; color: var(--primary); margin-bottom: 0.35rem; }
+
+    .handshake-header {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-main);
+      margin-bottom: 0.85rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .steps-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.85rem;
+    }
+    .step-box {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.75rem;
+      font-size: 0.78rem;
+      transition: all 0.2s ease;
+    }
+    .step-box.active {
+      border-color: var(--primary);
+      background: #eff6ff;
+    }
+    .step-num { font-weight: 700; color: var(--primary); margin-bottom: 0.25rem; font-size: 0.74rem; }
+    .step-desc { color: var(--text-muted); line-height: 1.35; }
+
+    .inspector-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.85rem;
+    }
+    .inspector-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-main);
+    }
+    .filters { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+    .filter-btn {
+      border: 1px solid var(--border);
+      background: #f8fafc;
+      color: var(--text-main);
+      border-radius: 20px;
+      padding: 0.3rem 0.75rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .filter-btn.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #ffffff;
+    }
+    .packet-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.78rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    .packet-table th {
+      text-align: left;
+      padding: 0.55rem;
+      color: var(--text-muted);
+      border-bottom: 2px solid var(--border);
+      font-weight: 600;
+      background: #f8fafc;
+    }
+    .packet-table td {
+      padding: 0.5rem 0.55rem;
+      border-bottom: 1px solid #eef2f7;
+    }
+    .tag {
+      padding: 0.18rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      display: inline-block;
+      letter-spacing: 0.02em;
+    }
+    .tag-multicast { background: var(--purple-bg); color: var(--purple); }
+    .tag-unicast { background: var(--info-bg); color: var(--info-text); }
+    .tag-alert { background: var(--red-bg); color: var(--red); }
+    .tag-grpc { background: var(--green-bg); color: var(--green); }
+    .tag-tcp { background: var(--orange-bg); color: var(--orange); }
+
+    @media (max-width: 768px) {
+      .steps-row { grid-template-columns: 1fr; }
+      body { padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="badge-dcim">DCIM</div>
+      <div>
+        <h1 class="brand-title">Topologia de Rede & Comunicações</h1>
+        <p class="brand-subtitle">Visualização em tempo real dos fluxos distribuídos: UDP Multicast, UDP Telemetria, Alertas, gRPC e TCP</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <a class="nav-link" href="/">← Voltar ao Dashboard</a>
+      <a class="nav-link" href="/events">Linha do Tempo →</a>
+      <div class="status-badge-gateway" id="gwStatusBadge">GATEWAY ONLINE</div>
+    </div>
+  </header>
+
+  <div class="card" style="padding: 0.85rem 1.25rem;">
+    <div class="legend-bar">
+      <span class="legend-title">Canais de Protocolo:</span>
+      <div class="legend-item"><span class="dot dot-purple"></span> UDP Multicast Discovery (239.255.0.1:9999)</div>
+      <div class="legend-item"><span class="dot dot-blue"></span> UDP Unicast Telemetria (:9998)</div>
+      <div class="legend-item"><span class="dot dot-red"></span> UDP Alerta Imediato (&gt;35°C)</div>
+      <div class="legend-item"><span class="dot dot-green"></span> gRPC Atuação RPC (:50051)</div>
+      <div class="legend-item"><span class="dot dot-orange"></span> TCP Framing Protobuf (:9997)</div>
+    </div>
+  </div>
+
+  <div class="canvas-container">
+    <canvas id="topologyCanvas"></canvas>
+    <div class="tooltip-card" id="tooltipCard">
+      <div class="tooltip-title" id="ttTitle">Detalhes do Nó</div>
+      <div id="ttContent">Passe o cursor sobre um nó para inspecionar.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="handshake-header">
+      <span>Ciclo de Descoberta Dinâmica de Fontes (Handshake)</span>
+      <span id="handshakeStatus" style="color: var(--text-muted); font-size: 0.78rem; text-transform: none; font-weight: normal;">Fontes ativas monitoradas via multicast e unicast</span>
+    </div>
+    <div class="steps-row">
+      <div class="step-box active" id="step1">
+        <div class="step-num">ETAPA 1: BEACON MULTICAST</div>
+        <div class="step-desc">Gateway envia DiscoveryRequest a cada 5s para 239.255.0.1:9999 com seu IP e porta UDP.</div>
+      </div>
+      <div class="step-box active" id="step2">
+        <div class="step-num">ETAPA 2: CAPTURA PELA FONTE</div>
+        <div class="step-desc">Fontes iniciadas sem endereço de Gateway capturam o pacote multicast e aprendem o endpoint.</div>
+      </div>
+      <div class="step-box active" id="step3">
+        <div class="step-num">ETAPA 3: ANÚNCIO UNICAST</div>
+        <div class="step-desc">Fonte responde via UDP Unicast ao Gateway com DeviceInfo (ID, tipo, IP e portas gRPC).</div>
+      </div>
+      <div class="step-box active" id="step4">
+        <div class="step-num">ETAPA 4: REGISTRO & STREAMING</div>
+        <div class="step-desc">Gateway registra o dispositivo como ONLINE e a fonte passa a enviar telemetria contínua.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="inspector-header">
+      <span class="inspector-title">Inspetor de Pacotes e Comunicações em Tempo Real</span>
+      <div class="filters">
+        <button class="filter-btn active" data-filter="all">Todos</button>
+        <button class="filter-btn" data-filter="multicast">Multicast</button>
+        <button class="filter-btn" data-filter="telemetry">UDP Telemetria</button>
+        <button class="filter-btn" data-filter="alert">UDP Alertas</button>
+        <button class="filter-btn" data-filter="grpc">gRPC</button>
+        <button class="filter-btn" data-filter="tcp">TCP</button>
+      </div>
+    </div>
+    <table class="packet-table">
+      <thead>
+        <tr>
+          <th>HORA</th>
+          <th>CANAL</th>
+          <th>ORIGEM</th>
+          <th>DESTINO</th>
+          <th>MENSAGEM PROTOBUF</th>
+          <th>PAYLOAD / DETALHES</th>
+        </tr>
+      </thead>
+      <tbody id="packetLogBody">
+        <tr><td colspan="6" style="text-align:center; color: var(--text-muted); padding: 1.25rem;">Aguardando tráfego de pacotes...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("topologyCanvas");
+    const ctx = canvas.getContext("2d");
+    const tooltipCard = document.getElementById("tooltipCard");
+    const ttTitle = document.getElementById("ttTitle");
+    const ttContent = document.getElementById("ttContent");
+    const packetLogBody = document.getElementById("packetLogBody");
+    const filterButtons = document.querySelectorAll(".filter-btn");
+
+    let currentFilter = "all";
+    let activePackets = [];
+    let devices = [];
+    let hoveredNode = null;
+    let packetHistory = [];
+
+    function resizeCanvas() {
+      canvas.width = canvas.parentElement.clientWidth;
+      canvas.height = 460;
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    filterButtons.forEach(btn => {
+      btn.addEventListener("click", () => {
+        filterButtons.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentFilter = btn.dataset.filter;
+        renderPacketTable();
+      });
+    });
+
+    const gatewayNode = {
+      id: "gateway-core",
+      label: "Gateway Central",
+      type: "GATEWAY",
+      ip: "127.0.0.1",
+      ports: "TCP:9997, UDP:9998, MCAST:9999",
+      isOnline: true,
+      x: 0, y: 0, radius: 36
+    };
+
+    const clientNode = {
+      id: "client-web",
+      label: "Cliente Web FastAPI",
+      type: "CLIENT",
+      ip: "127.0.0.1",
+      ports: "HTTP:8080, TCP->9997",
+      isOnline: true,
+      x: 0, y: 0, radius: 28
+    };
+
+    function updateNodePositions() {
+      const w = canvas.width;
+      const h = canvas.height;
+      gatewayNode.x = w * 0.48;
+      gatewayNode.y = h * 0.50;
+
+      clientNode.x = w * 0.12;
+      clientNode.y = h * 0.50;
+
+      const sourceCount = devices.length;
+      if (sourceCount === 0) return;
+
+      const angleStart = -Math.PI * 0.42;
+      const angleEnd = Math.PI * 0.42;
+      const radiusX = w * 0.36;
+      const radiusY = h * 0.38;
+
+      devices.forEach((dev, idx) => {
+        const t = sourceCount === 1 ? 0.5 : idx / (sourceCount - 1);
+        const angle = angleStart + t * (angleEnd - angleStart);
+        dev.x = gatewayNode.x + Math.cos(angle) * radiusX;
+        dev.y = gatewayNode.y + Math.sin(angle) * radiusY;
+        dev.radius = 24;
+      });
+    }
+
+    class PacketParticle {
+      constructor(fromNode, toNode, color, channel, msgType, details) {
+        this.from = fromNode;
+        this.to = toNode;
+        this.color = color;
+        this.channel = channel;
+        this.msgType = msgType;
+        this.details = details;
+        this.progress = 0;
+        this.speed = 0.016 + Math.random() * 0.01;
+      }
+      update() {
+        this.progress += this.speed;
+        return this.progress < 1;
+      }
+      draw(c) {
+        const x = this.from.x + (this.to.x - this.from.x) * this.progress;
+        const y = this.from.y + (this.to.y - this.from.y) * this.progress;
+        c.save();
+        c.beginPath();
+        c.arc(x, y, 5, 0, Math.PI * 2);
+        c.fillStyle = this.color;
+        c.shadowColor = this.color;
+        c.shadowBlur = 6;
+        c.fill();
+        c.restore();
+      }
+    }
+
+    function addPacketRecord(channel, fromId, toId, protoMsg, details) {
+      const now = new Date();
+      const timeStr = now.toTimeString().split(" ")[0] + "." + String(now.getMilliseconds()).padStart(3, "0");
+      const rec = { time: timeStr, channel, fromId, toId, protoMsg, details };
+      packetHistory.unshift(rec);
+      if (packetHistory.length > 50) packetHistory.pop();
+      renderPacketTable();
+    }
+
+    function renderPacketTable() {
+      const filtered = packetHistory.filter(p => {
+        if (currentFilter === "all") return true;
+        return p.channel.toLowerCase().includes(currentFilter);
+      });
+      if (filtered.length === 0) {
+        packetLogBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: var(--text-muted); padding: 1rem;">Nenhum pacote no filtro '${currentFilter}'.</td></tr>`;
+        return;
+      }
+      packetLogBody.innerHTML = filtered.slice(0, 15).map(p => {
+        let tagClass = "tag-unicast";
+        if (p.channel.includes("multicast")) tagClass = "tag-multicast";
+        if (p.channel.includes("alert")) tagClass = "tag-alert";
+        if (p.channel.includes("grpc")) tagClass = "tag-grpc";
+        if (p.channel.includes("tcp")) tagClass = "tag-tcp";
+        return `
+          <tr>
+            <td style="color: var(--text-muted); font-size: 0.74rem;">${p.time}</td>
+            <td><span class="tag ${tagClass}">${p.channel.toUpperCase()}</span></td>
+            <td><strong>${p.fromId}</strong></td>
+            <td><strong>${p.toId}</strong></td>
+            <td style="color: #0284c7; font-weight: 600;">${p.protoMsg}</td>
+            <td style="color: #334155;">${p.details}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function drawEdge(c, n1, n2, color, isDashed = false) {
+      c.save();
+      c.beginPath();
+      c.moveTo(n1.x, n1.y);
+      c.lineTo(n2.x, n2.y);
+      c.strokeStyle = isDashed ? "#cbd5e1" : color;
+      c.lineWidth = isDashed ? 1.5 : 2.0;
+      if (isDashed) c.setLineDash([5, 5]);
+      c.stroke();
+      c.restore();
+    }
+
+    function drawNode(c, node) {
+      const isOnline = Boolean(node.is_online !== undefined ? node.is_online : node.isOnline);
+      const isAlert = Boolean(node.isAlert);
+
+      let strokeColor = isOnline ? "#0284c7" : "#dc2626";
+      let fillColor = isOnline ? "#ffffff" : "#fee2e2";
+      if (node.type === "GATEWAY") {
+        strokeColor = "#0b2545";
+        fillColor = "#0b2545";
+      } else if (node.type === "CLIENT") {
+        strokeColor = "#ea580c";
+        fillColor = "#ffedd5";
+      } else if (node.device_type === "AIR_CONDITIONER") {
+        strokeColor = isOnline ? "#0a8754" : "#dc2626";
+        fillColor = isOnline ? "#dcfce7" : "#fee2e2";
+      } else if (node.device_type === "RACK_PDU") {
+        strokeColor = isOnline ? "#d97706" : "#dc2626";
+        fillColor = isOnline ? "#fef3c7" : "#fee2e2";
+      }
+      if (isAlert) {
+        strokeColor = "#dc2626";
+        fillColor = "#fee2e2";
+      }
+
+      c.save();
+      c.beginPath();
+      c.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+      c.fillStyle = fillColor;
+      c.shadowColor = isAlert ? "rgba(220, 38, 38, 0.4)" : "rgba(0, 0, 0, 0.1)";
+      c.shadowBlur = node === hoveredNode ? 14 : 6;
+      c.fill();
+      c.lineWidth = node === hoveredNode ? 3.0 : 2.0;
+      c.strokeStyle = strokeColor;
+      c.stroke();
+
+      c.fillStyle = "#0f172a";
+      c.font = "bold 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+      c.textAlign = "center";
+      c.fillText(node.label || node.device_id, node.x, node.y - node.radius - 8);
+
+      c.font = "bold 9px monospace";
+      c.fillStyle = isOnline ? "#0a8754" : "#dc2626";
+      c.fillText(isOnline ? "ONLINE" : "OFFLINE", node.x, node.y + node.radius + 15);
+
+      c.font = "14px sans-serif";
+      c.textAlign = "center";
+      c.textBaseline = "middle";
+      let icon = "💻";
+      if (node.type === "GATEWAY") icon = "🌐";
+      if (node.device_type === "TEMPERATURE_SENSOR") icon = "🌡️";
+      if (node.device_type === "RACK_PDU") icon = "⚡";
+      if (node.device_type === "AIR_CONDITIONER") icon = "❄️";
+      c.fillText(icon, node.x, node.y);
+      c.restore();
+    }
+
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.save();
+      ctx.fillStyle = "#f8fafc";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#e2e8f0";
+      for (let x = 20; x < canvas.width; x += 30) {
+        for (let y = 20; y < canvas.height; y += 30) {
+          ctx.beginPath();
+          ctx.arc(x, y, 1, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+
+      updateNodePositions();
+
+      drawEdge(ctx, clientNode, gatewayNode, "#ea580c");
+
+      devices.forEach(dev => {
+        const isOnline = Boolean(dev.is_online);
+        let edgeColor = "#0284c7";
+        if (dev.device_type === "AIR_CONDITIONER") edgeColor = "#0a8754";
+        if (dev.device_type === "RACK_PDU") edgeColor = "#d97706";
+        if (dev.isAlert) edgeColor = "#dc2626";
+        drawEdge(ctx, gatewayNode, dev, edgeColor, !isOnline);
+      });
+
+      activePackets = activePackets.filter(p => {
+        const alive = p.update();
+        if (alive) p.draw(ctx);
+        return alive;
+      });
+
+      drawNode(ctx, gatewayNode);
+      drawNode(ctx, clientNode);
+      devices.forEach(dev => drawNode(ctx, dev));
+
+      requestAnimationFrame(animate);
+    }
+
+    async function fetchState() {
+      try {
+        const [devRes, histRes] = await Promise.all([
+          fetch("/api/devices"),
+          fetch("/api/telemetry/history?limit=15")
+        ]);
+        if (devRes.ok) {
+          const freshDevs = await devRes.json();
+          devices = freshDevs.map(fd => {
+            const existing = devices.find(d => d.device_id === fd.device_id);
+            const isOnline = Boolean(fd.is_online);
+            return {
+              ...fd,
+              is_online: isOnline,
+              isOnline: isOnline,
+              label: fd.device_id,
+              isAlert: Boolean(fd.state_summary && fd.state_summary.includes("ALERTA")),
+              x: existing ? existing.x : gatewayNode.x,
+              y: existing ? existing.y : gatewayNode.y
+            };
+          });
+        }
+        if (histRes.ok) {
+          const recs = await histRes.json();
+          if (recs.length > 0 && Math.random() < 0.8) {
+            const sample = recs[Math.floor(Math.random() * Math.min(recs.length, 5))];
+            const srcNode = devices.find(d => d.device_id === sample.device_id);
+            if (srcNode && srcNode.is_online) {
+              const isAlert = Boolean(sample.is_alert || sample.temperature_c > 35);
+              const ch = isAlert ? "alert" : "telemetry";
+              const col = isAlert ? "#dc2626" : (srcNode.device_type === "RACK_PDU" ? "#d97706" : "#0284c7");
+              const desc = isAlert
+                ? `Alerta Anomalia: ${sample.temperature_c.toFixed(1)} °C (>35°C)`
+                : `Temp: ${sample.temperature_c ? sample.temperature_c.toFixed(1) + '°C' : sample.power_watts + 'W'}`;
+              activePackets.push(new PacketParticle(srcNode, gatewayNode, col, ch, "TelemetryPacket", desc));
+              addPacketRecord(ch, srcNode.device_id, "gateway-core", "TelemetryPacket", desc);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Polling error:", err);
+      }
+    }
+
+    setInterval(fetchState, 1500);
+    fetchState();
+
+    setInterval(() => {
+      devices.forEach(dev => {
+        if (dev.is_online) {
+          activePackets.push(new PacketParticle(gatewayNode, dev, "#7c3aed", "multicast", "DiscoveryRequest", "Multicast beacon 239.255.0.1:9999"));
+        }
+      });
+      addPacketRecord("multicast", "gateway-core", "239.255.0.1:9999", "DiscoveryRequest", "Beacon periódico de descoberta");
+    }, 5000);
+
+    setInterval(() => {
+      activePackets.push(new PacketParticle(clientNode, gatewayNode, "#ea580c", "tcp", "ClientRequest", "LIST_DEVICES / GET_HISTORY (framing 4B)"));
+      addPacketRecord("tcp", "client-web", "gateway-core", "ClientRequest", "Polling TCP com delimitação de tamanho");
+    }, 3000);
+
+    canvas.addEventListener("mousemove", e => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const all = [gatewayNode, clientNode, ...devices];
+      hoveredNode = all.find(n => {
+        const dx = n.x - mx;
+        const dy = n.y - my;
+        return Math.sqrt(dx * dx + dy * dy) <= (n.radius || 24);
+      });
+      if (hoveredNode) {
+        const isOnline = Boolean(hoveredNode.is_online !== undefined ? hoveredNode.is_online : hoveredNode.isOnline);
+        tooltipCard.style.display = "block";
+        ttTitle.innerText = hoveredNode.label || hoveredNode.device_id;
+        ttContent.innerHTML = `
+          <div><strong>Tipo:</strong> ${hoveredNode.type || hoveredNode.device_type}</div>
+          <div><strong>IP:</strong> ${hoveredNode.ip || '127.0.0.1'}</div>
+          <div><strong>Portas:</strong> ${hoveredNode.ports || (hoveredNode.grpc_port ? 'gRPC:' + hoveredNode.grpc_port : 'UDP: dinâmico')}</div>
+          <div><strong>Status:</strong> ${isOnline ? '<span style="color:#0a8754; font-weight:700;">ONLINE</span>' : '<span style="color:#dc2626; font-weight:700;">OFFLINE</span>'}</div>
+          <div><strong>Estado:</strong> ${hoveredNode.state_summary || 'Operacional'}</div>
+        `;
+      } else {
+        tooltipCard.style.display = "none";
+      }
+    });
+
+    animate();
+  </script>
+</body>
+</html>

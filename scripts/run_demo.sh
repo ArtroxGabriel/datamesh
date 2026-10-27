@@ -280,7 +280,8 @@ add_sensor_menu() {
         NEXT_PDU_IDX=$((NEXT_PDU_IDX + 1))
         register_source "$new_id" "pdu" "$base_w"
         start_source "$new_id"
-        echo "  PDU ${new_id} (${base_w} W) iniciada (PID ${SOURCE_PIDS[$new_id]}). Aparece no Dashboard após o próximo pedido de descoberta (até 5 s)."
+        echo "  PDU ${new_id} (${base_w} W) iniciada (PID ${SOURCE_PIDS[$new_id]})."
+        echo "  [Handshake] Acompanhe a descoberta em tempo real na aba Topologia: http://localhost:${WEB_PORT}/network"
     else
         local rack_num
         rack_num=$(printf "%02d" "$NEXT_TEMP_IDX")
@@ -290,7 +291,8 @@ add_sensor_menu() {
         register_source "$new_id" "temp" "$base_t"
         start_source "$new_id"
         sleep 0.4
-        echo "  Sensor ${new_id} (${base_t} °C) iniciado (PID ${SOURCE_PIDS[$new_id]}). Aparece no Dashboard após o próximo pedido de descoberta (até 5 s)."
+        echo "  Sensor ${new_id} (${base_t} °C) iniciado (PID ${SOURCE_PIDS[$new_id]})."
+        echo "  [Handshake] Acompanhe a descoberta em tempo real na aba Topologia: http://localhost:${WEB_PORT}/network"
     fi
 }
 
@@ -356,6 +358,8 @@ while true; do
     echo "======================================================================"
     echo "  DataMesh DCIM, console de demonstração"
     echo "  Dashboard: http://localhost:${WEB_PORT}"
+    echo "  Topologia & Rede: http://localhost:${WEB_PORT}/network"
+    echo "  Eventos:   http://localhost:${WEB_PORT}/events"
     echo "  Logs: tail -f ${LOG_FILE}"
     echo "======================================================================"
     echo "  [1] Disparar anomalia térmica (acima de 35 °C) em um sensor"
