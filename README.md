@@ -206,4 +206,7 @@ mise exec -- go test -v ./sources/pdu/...
 
 # Sobe todos os processos, testa descoberta, gRPC e consultas, e encerra
 ./scripts/run_demo.sh --smoke
+
+# Limpeza completa (encerra processos órfãos, limpa caches/bancos e regera builds)
+mise exec -- task clean
 ```

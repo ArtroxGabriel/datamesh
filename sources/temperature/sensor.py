@@ -221,6 +221,16 @@ class TemperatureSensor:
                 socket.INADDR_ANY,
             )
             sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+            # Also join group on loopback (127.0.0.1) so discovery is robust on local runs
+            try:
+                mreq_lo = struct.pack(
+                    "4s4s",
+                    socket.inet_aton(self.multicast_group),
+                    socket.inet_aton("127.0.0.1"),
+                )
+                sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq_lo)
+            except Exception:
+                pass
             sock.settimeout(SOCKET_TIMEOUT_SEC)
             self._mcast_sock = sock
             self._running = True

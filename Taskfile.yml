@@ -41,3 +41,13 @@ tasks:
     desc: Run automated end-to-end smoke test across all local processes
     cmds:
       - bash scripts/run_demo.sh --smoke
+
+  clean:
+    desc: Stop background processes, purge cache/databases, and rebuild artifacts
+    cmds:
+      - bash scripts/clean.sh
+
+  cleanup:
+    desc: Alias for clean
+    cmds:
+      - task: clean

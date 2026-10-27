@@ -50,6 +50,8 @@ docs/, proto/, gen/, gateway/, sources/, client/, scripts/
 - Linters, Checagem de Tipos & Formatação:
   - Python: `uv run ty check` (type checking da Astral: <https://docs.astral.sh/ty/>), `uv run ruff check .` e `uv run ruff format .`
   - Go: `mise exec -- go vet ./sources/pdu/...` e `mise exec -- gofmt -w ./sources/pdu`
+- Limpeza do Ambiente e Caches:
+  `mise exec -- task clean` (ou `scripts/clean.sh`)
 
 ## Environment / Setup
 

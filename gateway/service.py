@@ -144,7 +144,17 @@ class GatewayCoordinator:
         data = beacon.SerializeToString()
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as sock:
             sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
+            sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 1)
             sock.sendto(data, (multicast_group, multicast_port))
+            # Also emit via loopback interface so local processes receive beacons
+            # even when physical network card or router filters multicast loopback.
+            try:
+                sock.setsockopt(
+                    socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton("127.0.0.1")
+                )
+                sock.sendto(data, (multicast_group, multicast_port))
+            except Exception:
+                pass
 
     def start_tcp_server(self, host: str = "0.0.0.0", port: int = 9997) -> int:
         """Starts TCP client listener thread on host:port, returning the bound port.

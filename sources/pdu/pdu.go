@@ -269,27 +269,38 @@ func (p *PDU) StartMulticastListener(ctx context.Context) {
 		return
 	}
 
-	conn, err := net.ListenMulticastUDP("udp4", nil, gaddr)
-	if err != nil {
-		log.Printf("[PDU] Multicast bind failed: %v. Using static gateway fallback.", err)
-		return
-	}
-	defer conn.Close()
-
-	buf := make([]byte, MaxDatagramBytes)
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
-			n, _, err := conn.ReadFrom(buf)
-			if err != nil {
-				continue
-			}
-			if _, err := p.HandleDiscoveryRequest(buf[:n]); err != nil {
-				log.Printf("[PDU] Malformed beacon received: %v", err)
+	listenOnConn := func(conn *net.UDPConn) {
+		defer conn.Close()
+		buf := make([]byte, MaxDatagramBytes)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+				n, _, err := conn.ReadFrom(buf)
+				if err != nil {
+					continue
+				}
+				if _, err := p.HandleDiscoveryRequest(buf[:n]); err != nil {
+					log.Printf("[PDU] Malformed beacon received: %v", err)
+				}
 			}
 		}
 	}
+
+	conn, err := net.ListenMulticastUDP("udp4", nil, gaddr)
+	if err != nil {
+		log.Printf("[PDU] Multicast bind failed: %v. Using static gateway fallback.", err)
+	} else {
+		go listenOnConn(conn)
+	}
+
+	if loIface, err := net.InterfaceByName("lo"); err == nil {
+		if loConn, err := net.ListenMulticastUDP("udp4", loIface, gaddr); err == nil {
+			go listenOnConn(loConn)
+		}
+	}
+
+	<-ctx.Done()
 }
