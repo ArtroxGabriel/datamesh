@@ -146,6 +146,10 @@ def create_app(
     def serve_events_page() -> Any:
         return _serve_static_page("events.html")
 
+    @app.get("/network", response_class=HTMLResponse)
+    def serve_network_page() -> Any:
+        return _serve_static_page("network.html")
+
     @app.get("/api/events")
     def get_events(limit: int = Query(default=200, ge=1, le=500)) -> list[dict[str, Any]]:
         return [_event_to_dict(e) for e in events.recent(limit)]

@@ -279,3 +279,14 @@ def test_events_page_and_api_list_recorded_actions(
     assert resp.status_code == 200
     categories = {e["category"] for e in resp.json()}
     assert categories == {"actuation", "analytics"}
+
+
+def test_network_page_returns_html(test_client: TestClient) -> None:
+    # Act
+    page = test_client.get("/network")
+
+    # Assert
+    assert page.status_code == 200
+    assert "Topologia" in page.text
+    assert "text/html" in page.headers["content-type"]
+
