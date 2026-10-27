@@ -125,6 +125,7 @@ O Cliente é um processo Python com FastAPI. O navegador fala HTTP com ele, e el
 - `client/gateway_client.py` (`TCPGatewayClient`) faz as quatro operações (`list_devices`, `get_history`, `control_ac` e `query_analytics`), cada uma numa conexão TCP com o Gateway na porta 9997.
 - `client/static/index.html` é o dashboard, atualizado a cada 2 s. Ele agrupa as fontes por tipo, destaca em vermelho os sensores em alerta e marca as fontes paradas como `OFFLINE`. Também mostra os gráficos, o painel de controle do ar-condicionado e as 3 consultas.
 - `client/events.py` e `client/static/events.html` formam a página `/events`, uma linha do tempo do sistema. Ela mostra a entrada de fontes, as mudanças entre `ONLINE` e `OFFLINE` e o início e o fim dos alertas. Também mostra os comandos enviados ao ar-condicionado e as consultas executadas. Uma thread do Cliente consulta o Gateway a cada 1 s, então a lista cobre a demonstração inteira mesmo que a página seja aberta depois.
+- `client/static/network.html` é a página `/network`, uma visualização gráfica interativa node-link em tempo real de toda a topologia distribuída. Ela exibe os canais de rede animados (UDP Multicast Discovery `239.255.0.1:9999`, UDP Telemetria `:9998`, Alertas Imediatos, gRPC `:50051` e TCP `:9997`), o ciclo de handshake de descoberta para novas fontes adicionadas e um inspetor de pacotes em tempo real com filtros por protocolo.
 
 ---
 

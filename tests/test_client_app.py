@@ -289,4 +289,3 @@ def test_network_page_returns_html(test_client: TestClient) -> None:
     assert page.status_code == 200
     assert "Topologia" in page.text
     assert "text/html" in page.headers["content-type"]
-
