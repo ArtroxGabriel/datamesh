@@ -44,7 +44,7 @@ flowchart TD
         TCP_CLI["Cliente TCP com Framing Protobuf"]
         TIMELINE["Poller e Linha do Tempo de Eventos"]
         HTTP_SRV["Servidor HTTP (:8080) e API REST"]
-        DASH["Dashboard SPA com Chart.js e Visualização /events"]
+        DASH["Dashboard SPA com Chart.js e páginas /events e /network"]
     end
 
     BROWSER["Navegador Web do Operador"]
@@ -68,7 +68,7 @@ flowchart TD
 
 ### Protocolos
 
-- UDP multicast (`239.255.0.1:9999`). Ao iniciar, e depois a cada 5 s, o Gateway envia um `DiscoveryRequest` com seu IP e a porta UDP de telemetria. Cada fonte responde com um `DeviceInfo`, que traz ID, tipo, IP, porta gRPC e estado inicial. As fontes só começam a mandar telemetria depois de receber esse pedido.
+- UDP multicast (`239.255.0.1:9999`). Ao iniciar, e depois a cada 5 s, o Gateway envia um `DiscoveryRequest` com seu IP e a porta UDP de telemetria. Cada fonte responde com um `DeviceInfo`, que traz ID, tipo, IP, porta gRPC e estado inicial. As fontes só começam a mandar telemetria depois de receber esse pedido. O beacon também sai pela interface de loopback, e as fontes entram no grupo por ela, para a descoberta funcionar numa só máquina mesmo quando a placa de rede não devolve o multicast para o próprio host.
 - UDP unicast (`:9998`). As fontes mandam pacotes `TelemetryPacket` periódicos. O sensor de temperatura também manda um pacote na hora quando passa de 35 °C.
 - gRPC (`:50051`). O Gateway chama `AirConditionerService.SetControl` para mudar o estado do ar-condicionado. A resposta traz o estado atualizado da fonte.
 - TCP (`:9997`). O Cliente e o Gateway trocam `ClientRequest` e `ClientResponse`. Antes de cada mensagem vão 4 bytes (`uint32` *big-endian*) com o tamanho dela. Isso é preciso porque o TCP entrega um fluxo de bytes sem separar as mensagens.
@@ -125,7 +125,7 @@ O Cliente é um processo Python com FastAPI. O navegador fala HTTP com ele, e el
 - `client/gateway_client.py` (`TCPGatewayClient`) faz as quatro operações (`list_devices`, `get_history`, `control_ac` e `query_analytics`), cada uma numa conexão TCP com o Gateway na porta 9997.
 - `client/static/index.html` é o dashboard, atualizado a cada 2 s. Ele agrupa as fontes por tipo, destaca em vermelho os sensores em alerta e marca as fontes paradas como `OFFLINE`. Também mostra os gráficos, o painel de controle do ar-condicionado e as 3 consultas.
 - `client/events.py` e `client/static/events.html` formam a página `/events`, uma linha do tempo do sistema. Ela mostra a entrada de fontes, as mudanças entre `ONLINE` e `OFFLINE` e o início e o fim dos alertas. Também mostra os comandos enviados ao ar-condicionado e as consultas executadas. Uma thread do Cliente consulta o Gateway a cada 1 s, então a lista cobre a demonstração inteira mesmo que a página seja aberta depois.
-- `client/static/network.html` é a página `/network`, uma visualização gráfica interativa node-link em tempo real de toda a topologia distribuída. Ela exibe os canais de rede animados (UDP Multicast Discovery `239.255.0.1:9999`, UDP Telemetria `:9998`, Alertas Imediatos, gRPC `:50051` e TCP `:9997`), o ciclo de handshake de descoberta para novas fontes adicionadas e um inspetor de pacotes em tempo real com filtros por protocolo.
+- `client/static/network.html` é a página `/network`, um diagrama animado da topologia. Os nós e o estado `ONLINE`/`OFFLINE` vêm do Gateway a cada 1,5 s. Os pacotes animados e a lista de pacotes são ilustrativos: a telemetria é tirada do histórico recente, e o beacon multicast e as requisições TCP aparecem em intervalos fixos. A página não captura o tráfego real da rede.
 
 ---
 
