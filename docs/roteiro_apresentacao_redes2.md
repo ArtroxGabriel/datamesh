@@ -72,21 +72,38 @@ git checkout feat/iot-security
 mise exec -- task demo
 ```
 
-#### Ponto A — Falta de Confidencialidade (Sniffing)
-- **O que mostrar:** Abrir o Wireshark (ou `tshark`) filtrando `udp.port == 9998 || tcp.port == 9997`.
+#### Ponto A — Falta de Confidencialidade (Sniffing com Wireshark)
+- **Ferramenta:** **Wireshark** na interface `lo` (Loopback).
+- **Filtro:**
+  ```text
+  udp.port == 9998 || tcp.port == 9997 || tcp.port == 50051
+  ```
+- **Dica (Dissector Protobuf):** Em *Edit → Preferences → Protocols → Protobuf → Protobuf Search Paths*, apontar para a pasta `proto/` do repositório para decodificar os campos diretamente na interface.
 - **O que a turma vê:** Os payloads Protobuf trafegam em texto claro; identificadores de dispositivos (`pdu-01-tesla`, `temp-01-turing`, `ac-01-carnot`) e métricas operacionais são legíveis diretamente no tráfego capturado.
 - **Pilar violado:** **Confidencialidade**.
 
-#### Ponto B — Falta de Integridade e Frescor (Mascaramento por Replay)
-- **O que mostrar:**
-  1. Mostrar a PDU `pdu-01-tesla` operando normalmente (~1400 W) e explicar que um pacote legítimo dessa leitura pode ser capturado da rede.
-  2. No console da demo, selecionar a opção **`[2] Disparar sobrecarga elétrica (~8000 W) em uma PDU`** — o processo real da PDU entra em estado de sobrecarga crítica (`IsAlert=true`, ~8000 W por 30 s).
-  3. Explicar/demonstrar o efeito "câmera em loop" (estilo Stuxnet): como o Gateway não valida assinatura, número de sequência nem janela de timestamp, reenviar o pacote antigo de ~1400 W faz o Gateway sobrescrever o estado exibido no Dashboard, ocultando a sobrecarga real.
+#### Ponto B — Falta de Integridade e Frescor (Mascaramento por Replay com Wireshark + `nc`)
+- **Ferramentas:** **Wireshark** (exportação do payload UDP) + **`nc` (Netcat)**.
+- **Passo a passo:**
+  1. No Wireshark, selecionar um pacote UDP legítimo da `pdu-01-tesla` indo para a porta `9998` (~1400 W), clicar com o botão direito na camada **`Data`** → **Export Packet Bytes…** e salvar em `/tmp/pdu_normal.bin`.
+  2. No console da demo (`run_demo.sh`), selecionar **`[2] Disparar sobrecarga elétrica (~8000 W) em uma PDU`** — o processo real da PDU entra em estado de sobrecarga crítica (`IsAlert=true`, ~8000 W por 30 s).
+  3. Reenviar o pacote antigo em loop com `nc`:
+     ```bash
+     while true; do nc -u -w 0 127.0.0.1 9998 < /tmp/pdu_normal.bin; sleep 0.5; done
+     ```
+- **O que a turma vê:** Como o Gateway não valida assinatura, número de sequência nem janela de timestamp, o pacote antigo de ~1400 W sobrescreve o estado exibido no Dashboard ("câmera em loop" / estilo Stuxnet), ocultando a sobrecarga real.
 - **Pilares violados:** **Integridade**, **Autenticidade** e **Frescor (Anti-Replay)**.
 
-#### Ponto C — Falta de Autenticação na Atuação (gRPC Aberto)
-- **O que mostrar:** O serviço `AirConditionerService` na porta `50051` roda sem TLS e sem autenticação mútua. Qualquer processo na rede local pode chamar `SetControl(power_on=false)` diretamente, ignorando o Gateway.
-- **O que a turma vê:** O ar-condicionado `ac-01-carnot` é desligado no Dashboard sem qualquer credencial ou auditoria de quem emitiu o comando.
+#### Ponto C — Falta de Autenticação na Atuação (gRPC Aberto com `grpcurl`)
+- **Ferramenta:** **`grpcurl`** (cliente CLI padrão para gRPC).
+- **Comando:**
+  ```bash
+  grpcurl -plaintext \
+    -import-path proto -proto datamesh.proto \
+    -d '{"device_id":"ac-01-carnot","power_on":false,"target_temp_c":28.0,"fan_speed_pct":0}' \
+    127.0.0.1:50051 datamesh.AirConditionerService/SetControl
+  ```
+- **O que a turma vê:** Retorna `"success": true` e desliga o `ac-01-carnot` no Dashboard sem nenhuma credencial, ignorando o Gateway e sem trilha de auditoria.
 - **Pilares violados:** **Autenticidade**, **Controle de Acesso**, **Disponibilidade** e **Não-Repúdio**.
 
 ---
@@ -112,7 +129,14 @@ mise exec -- task demo
   - Tanto o gRPC (`:50051`) quanto o TCP (`:9997`) exigem **Mutual TLS (`mTLS`)**: servidor e cliente validam mutuamente seus certificados durante o handshake TLS.
 - **O que a turma vê:**
   - No Wireshark, o tráfego TCP/gRPC aparece cifrado como `TLSv1.3 Application Data` (confidencialidade restaurada).
-  - Uma tentativa direta na porta `50051` sem certificado válido assinado pela CA falha ainda no **TLS Handshake** (`UNAUTHENTICATED` / `TLS Fatal Alert`), impedindo o desligamento não autorizado do AC.
+  - O mesmo comando `grpcurl -plaintext` (ou sem certificado de cliente) falha ainda no **TLS Handshake** (`UNAUTHENTICATED` / `TLS Fatal Alert`), impedindo o desligamento não autorizado do AC.
+  - Passando os certificados emitidos pela CA, o comando autenticado funciona normalmente:
+    ```bash
+    grpcurl -cacert certs/ca.crt -cert certs/gateway.crt -key certs/gateway.key \
+      -import-path proto -proto datamesh.proto \
+      -d '{"device_id":"ac-01-carnot","power_on":true,"target_temp_c":20.0,"fan_speed_pct":70}' \
+      127.0.0.1:50051 datamesh.AirConditionerService/SetControl
+    ```
 
 ---
 
