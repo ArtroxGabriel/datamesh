@@ -259,6 +259,34 @@ trigger_anomaly_menu() {
     fi
 }
 
+trigger_pdu_overload_menu() {
+    echo ""
+    echo "PDUs ativas:"
+    local active_pdus=()
+    local idx=1
+    for id in "${SOURCE_ORDER[@]}"; do
+        if [[ "${SOURCE_TYPES[$id]}" == "pdu" ]] && is_running "$id"; then
+            echo "  [$idx] $id (Base ${SOURCE_PARAMS[$id]} W)"
+            active_pdus+=("$id")
+            idx=$((idx + 1))
+        fi
+    done
+    if [[ ${#active_pdus[@]} -eq 0 ]]; then
+        echo "  Nenhuma PDU ativa no momento."
+        return
+    fi
+    read -r -p "Escolha o número da PDU [padrão: 1 (${active_pdus[0]})]: " choice
+    choice="${choice:-1}"
+    local sel_idx=$((choice - 1))
+    if [[ $sel_idx -ge 0 && $sel_idx -lt ${#active_pdus[@]} ]]; then
+        local target_id="${active_pdus[$sel_idx]}"
+        kill -USR1 "${SOURCE_PIDS[$target_id]}"
+        echo "  ${target_id} disparou alerta imediato de sobrecarga elétrica (~8000 W por 30 s)."
+    else
+        echo "  Opção inválida."
+    fi
+}
+
 add_sensor_menu() {
     echo ""
     echo "Qual tipo de fonte deseja adicionar dinamicamente?"
@@ -363,22 +391,24 @@ while true; do
     echo "  Logs: tail -f ${LOG_FILE}"
     echo "======================================================================"
     echo "  [1] Disparar anomalia térmica (acima de 35 °C) em um sensor"
-    echo "  [2] Adicionar sensor ou PDU com a demo rodando"
-    echo "  [3] Simular falha de uma fonte (ONLINE para OFFLINE)"
-    echo "  [4] Religar uma fonte parada (OFFLINE para ONLINE)"
-    echo "  [5] Listar o estado dos processos"
-    echo "  [6] Mostrar as últimas 15 linhas do log"
+    echo "  [2] Disparar sobrecarga elétrica (~8000 W) em uma PDU"
+    echo "  [3] Adicionar sensor ou PDU com a demo rodando"
+    echo "  [4] Simular falha de uma fonte (ONLINE para OFFLINE)"
+    echo "  [5] Religar uma fonte parada (OFFLINE para ONLINE)"
+    echo "  [6] Listar o estado dos processos"
+    echo "  [7] Mostrar as últimas 15 linhas do log"
     echo "  [q] Encerrar a demonstração"
     echo "======================================================================"
     read -r -p "Selecione uma ação: " action || break
     case "$action" in
         1) trigger_anomaly_menu ;;
-        2) add_sensor_menu ;;
-        3) stop_source_menu ;;
-        4) restart_source_menu ;;
-        5) print_status_table ;;
-        6) echo ""; tail -n 15 "$LOG_FILE" || true ;;
+        2) trigger_pdu_overload_menu ;;
+        3) add_sensor_menu ;;
+        4) stop_source_menu ;;
+        5) restart_source_menu ;;
+        6) print_status_table ;;
+        7) echo ""; tail -n 15 "$LOG_FILE" || true ;;
         q|Q) break ;;
-        *) echo "  Opção inválida. Use 1 a 6 ou q." ;;
+        *) echo "  Opção inválida. Use 1 a 7 ou q." ;;
     esac
 done

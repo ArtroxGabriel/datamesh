@@ -17,14 +17,16 @@ const (
 	DefaultDeviceID = "pdu-rack-01"
 	// Empty on purpose, so the PDU only streams after it finds the Gateway through
 	// multicast discovery. Set GATEWAY_HOST to pin a fixed address instead.
-	DefaultGatewayHost    = ""
-	DefaultGatewayPort    = 9998
-	DefaultSendInterval   = 3 * time.Second
-	DefaultMulticastGroup = "239.255.0.1"
-	DefaultMulticastPort  = 9999
-	DefaultBasePowerWatts = 1400.0
-	DefaultVoltageVolts   = 220.0
-	MaxDatagramBytes      = 2048
+	DefaultGatewayHost        = ""
+	DefaultGatewayPort        = 9998
+	DefaultSendInterval       = 3 * time.Second
+	DefaultMulticastGroup     = "239.255.0.1"
+	DefaultMulticastPort      = 9999
+	DefaultBasePowerWatts     = 1400.0
+	DefaultOverloadPowerWatts = 8000.0
+	DefaultOverloadDuration   = 30 * time.Second
+	DefaultVoltageVolts       = 220.0
+	MaxDatagramBytes          = 2048
 )
 
 // UDPPacketSender abstracts UDP datagram transmission for testing and decoupling.
@@ -70,10 +72,12 @@ type Config struct {
 
 // PDU represents a Rack Power Distribution Unit data source.
 type PDU struct {
-	mu          sync.RWMutex
-	cfg         Config
-	gatewayAddr *net.UDPAddr
-	sender      UDPPacketSender
+	mu            sync.RWMutex
+	cfg           Config
+	gatewayAddr   *net.UDPAddr
+	sender        UDPPacketSender
+	overloadUntil time.Time
+	overloadWatts float64
 }
 
 // NewPDU constructs a PDU instance with validated defaults and network endpoints.
@@ -131,12 +135,35 @@ func (p *PDU) GatewayEndpoint() (string, int) {
 	return p.gatewayAddr.IP.String(), p.gatewayAddr.Port
 }
 
+// TriggerOverload simulates a sustained power overload spike and immediately transmits an alert.
+func (p *PDU) TriggerOverload(powerWatts float64, duration time.Duration) error {
+	if powerWatts <= 0 {
+		powerWatts = DefaultOverloadPowerWatts
+	}
+	if duration <= 0 {
+		duration = DefaultOverloadDuration
+	}
+
+	p.mu.Lock()
+	p.overloadWatts = powerWatts
+	p.overloadUntil = time.Now().Add(duration)
+	deviceID := p.cfg.DeviceID
+	p.mu.Unlock()
+
+	log.Printf("[PDU] OVERLOAD TRIGGERED on %s: %.0f W for %v", deviceID, powerWatts, duration)
+	return p.SendTelemetry()
+}
+
 // CreateTelemetryPacket generates a simulated PDU reading with realistic electrical jitter.
 func (p *PDU) CreateTelemetryPacket() *datameshpb.TelemetryPacket {
 	p.mu.RLock()
 	basePower := p.cfg.BasePowerWatts
 	voltage := p.cfg.VoltageVolts
 	deviceID := p.cfg.DeviceID
+	isAlert := time.Now().Before(p.overloadUntil)
+	if isAlert {
+		basePower = p.overloadWatts
+	}
 	p.mu.RUnlock()
 
 	jitter := (rand.Float64() - 0.5) * 50.0 // +/- 25 Watts
@@ -147,7 +174,7 @@ func (p *PDU) CreateTelemetryPacket() *datameshpb.TelemetryPacket {
 		DeviceId:    deviceID,
 		DeviceType:  datameshpb.DeviceType_RACK_PDU,
 		TimestampMs: time.Now().UnixMilli(),
-		IsAlert:     false,
+		IsAlert:     isAlert,
 		Payload: &datameshpb.TelemetryPacket_Pdu{
 			Pdu: &datameshpb.PDUTelemetry{
 				PowerWatts:   power,

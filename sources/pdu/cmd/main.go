@@ -67,6 +67,21 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
+	usr1Ch := make(chan os.Signal, 1)
+	signal.Notify(usr1Ch, syscall.SIGUSR1)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-usr1Ch:
+				if err := unit.TriggerOverload(pdu.DefaultOverloadPowerWatts, pdu.DefaultOverloadDuration); err != nil {
+					log.Printf("[PDU] Error sending overload telemetry: %v", err)
+				}
+			}
+		}
+	}()
+
 	log.Printf("[PDU] %s started. Target: %s:%d, Interval: %v, Multicast: %s:%d",
 		cfg.DeviceID, cfg.GatewayHost, cfg.GatewayPort, cfg.SendInterval,
 		cfg.MulticastGroup, cfg.MulticastPort)

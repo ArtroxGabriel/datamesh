@@ -28,9 +28,9 @@ Documento síntese da proposta, arquitetura, vulnerabilidades e mitigações par
 
 ---
 
-## 3. Cenário 1: Arquitetura Atual (`feat/iot-security-solved`) e Ataques Práticos
+## 3. Cenário 1: Arquitetura Atual (`feat/iot-security`) e Ataques Práticos
 
-O DataMesh na branch `feat/iot-security-solved` foi desenvolvido com foco em distribuição de processos, operando em canais abertos:
+O DataMesh na branch `feat/iot-security` foi desenvolvido com foco em distribuição de processos, operando em canais abertos:
 
 - **UDP Multicast (`239.255.0.1:9999`):** Descoberta de fontes sem autenticação de beacon.
 - **UDP Unicast (`:9998`):** Ingestão contínua de telemetria em Protobuf puro.
