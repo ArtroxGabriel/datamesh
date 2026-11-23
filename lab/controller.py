@@ -1,0 +1,196 @@
+"""Local presenter console and tightly scoped Compose controller."""
+
+import asyncio
+import json
+import os
+import subprocess
+import threading
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, StreamingResponse
+from pydantic import BaseModel
+
+app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+ATTACKER = "http://172.30.53.10:8091"
+CLIENT = "http://172.30.53.13:8080"
+PROJECT = "datamesh-security-lab"
+ROOT = os.environ.get("LAB_REPO_ROOT", "/workspace")
+switch_lock = threading.Lock()
+switching = False
+switch_error = ""
+
+
+class ModeRequest(BaseModel):
+    mode: str
+
+
+class ScenarioRequest(BaseModel):
+    scenario: str
+    automatic: bool = True
+
+
+@app.middleware("http")
+async def local_host_only(request: Request, call_next):
+    host = request.headers.get("host", "").split(":")[0]
+    origin = request.headers.get("origin", "")
+    if host not in {"localhost", "127.0.0.1"} or (
+        origin and origin not in {"http://localhost:8081", "http://127.0.0.1:8081"}
+    ):
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse({"detail": "local access only"}, status_code=403)
+    return await call_next(request)
+
+
+def fetch(url: str, data: dict | None = None) -> dict | list:
+    body = None if data is None else json.dumps(data).encode()
+    request = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(request, timeout=3) as response:
+        return json.load(response)
+
+
+def snapshot() -> dict:
+    result: dict = {"switching": switching, "switch_error": switch_error, "ready": False}
+    try:
+        result["security"] = fetch(CLIENT + "/api/security-events")
+        result["devices"] = fetch(CLIENT + "/api/devices")
+        result["history"] = fetch(CLIENT + "/api/telemetry/history?limit=100")
+        result["attacker"] = fetch(ATTACKER + "/status")
+        result["runs"] = fetch(ATTACKER + "/runs")
+        result["ready"] = not switching
+    except (OSError, ValueError):
+        result["error"] = "Aguardando Gateway, cliente e atacante"
+    return result
+
+
+def switch_stack(mode: str) -> None:
+    global switching, switch_error
+    try:
+        env = dict(os.environ, DATAMESH_SECURITY_MODE=mode, PWD=ROOT)
+        command = [
+            "docker",
+            "compose",
+            "-p",
+            PROJECT,
+            "-f",
+            "compose.lab.yml",
+            "--profile",
+            "attack",
+            "up",
+            "-d",
+            "--no-build",
+            "--force-recreate",
+            "gateway",
+            "client",
+            "temperature",
+            "pdu",
+            "ac",
+            "attacker",
+        ]
+        result = subprocess.run(
+            command, cwd=ROOT, env=env, capture_output=True, text=True, timeout=120
+        )
+        if result.returncode:
+            raise RuntimeError(result.stderr[-1500:])
+        deadline = time.monotonic() + 45
+        while time.monotonic() < deadline:
+            try:
+                security = fetch(CLIENT + "/api/security-events")
+                devices = fetch(CLIENT + "/api/devices")
+                fetch(ATTACKER + "/status")
+                if (
+                    isinstance(security, dict)
+                    and security.get("mode") == mode
+                    and isinstance(devices, list)
+                    and len(devices) >= 3
+                ):
+                    return
+            except (OSError, ValueError):
+                pass
+            time.sleep(1)
+        raise TimeoutError("Os serviços não ficaram prontos no modo solicitado")
+    except Exception as err:
+        switch_error = str(err)
+    finally:
+        with switch_lock:
+            switching = False
+
+
+@app.get("/")
+def page() -> FileResponse:
+    return FileResponse(Path(__file__).with_name("console.html"))
+
+
+@app.get("/api/state")
+def state() -> dict:
+    return snapshot()
+
+
+@app.get("/api/stream")
+async def stream() -> StreamingResponse:
+    async def events():
+        while True:
+            state = await asyncio.to_thread(snapshot)
+            yield "data: " + json.dumps(state, ensure_ascii=False) + "\n\n"
+            await asyncio.sleep(1)
+
+    return StreamingResponse(
+        events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"}
+    )
+
+
+@app.post("/api/mode")
+def change_mode(request: ModeRequest) -> dict:
+    global switching, switch_error
+    if request.mode not in {"secure", "insecure"}:
+        raise HTTPException(400, "Modo inválido")
+    with switch_lock:
+        if switching:
+            raise HTTPException(409, "Troca em andamento")
+        state = snapshot()
+        if not state.get("ready"):
+            raise HTTPException(503, "Laboratório indisponível")
+        if state.get("attacker", {}).get("run"):
+            raise HTTPException(409, "Aguarde a conclusão do cenário")
+        switching = True
+        switch_error = ""
+    threading.Thread(target=switch_stack, args=(request.mode,), daemon=True).start()
+    return {"switching": True}
+
+
+@app.post("/api/run")
+def start_run(request: ScenarioRequest) -> dict:
+    if request.scenario not in {"sniff", "replay", "hijack"}:
+        raise HTTPException(400, "Cenário inválido")
+    state = snapshot()
+    if not state.get("ready"):
+        raise HTTPException(503, "Laboratório indisponível")
+    try:
+        result = fetch(
+            ATTACKER + "/run",
+            {
+                "scenario": request.scenario,
+                "automatic": request.automatic,
+                "mode": state["security"]["mode"],
+            },
+        )
+    except urllib.error.HTTPError as err:
+        raise HTTPException(err.code, "Cenário indisponível") from err
+    if not isinstance(result, dict):
+        raise HTTPException(502, "Resposta inválida")
+    return result
+
+
+@app.post("/api/continue")
+def continue_run() -> dict:
+    try:
+        result = fetch(ATTACKER + "/continue", {})
+    except urllib.error.HTTPError as err:
+        raise HTTPException(err.code, "Nenhum replay aguardando confirmação") from err
+    if not isinstance(result, dict):
+        raise HTTPException(502, "Resposta inválida")
+    return result

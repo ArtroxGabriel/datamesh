@@ -4,6 +4,14 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+export DATAMESH_SECURITY_MODE="${DATAMESH_SECURITY_MODE:-insecure}"
+if [[ "$DATAMESH_SECURITY_MODE" != insecure && "$DATAMESH_SECURITY_MODE" != secure ]]; then
+    echo "DATAMESH_SECURITY_MODE must be insecure or secure" >&2
+    exit 1
+fi
+if [[ "$DATAMESH_SECURITY_MODE" == secure ]]; then
+    scripts/security/setup_lab.sh
+fi
 export PYTHONPATH="${ROOT_DIR}:${ROOT_DIR}/gen/python"
 export GATEWAY_HOST="${GATEWAY_HOST:-127.0.0.1}"
 export GATEWAY_TCP_PORT="${GATEWAY_TCP_PORT:-9997}"
@@ -77,6 +85,9 @@ register_source() {
     local id="$1"
     local type="$2"
     local param="$3"
+    if [[ "$DATAMESH_SECURITY_MODE" == secure ]]; then
+        python scripts/security/generate_hmac_keys.py "$id"
+    fi
     local seen=0
     for existing in "${SOURCE_ORDER[@]:-}"; do
         if [[ "$existing" == "$id" ]]; then

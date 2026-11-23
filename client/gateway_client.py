@@ -7,6 +7,7 @@ from typing import Protocol
 import datamesh_pb2
 
 from common.framing import recv_proto, send_proto
+from common.tls import client_context, secure_mode
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +65,10 @@ class TCPGatewayClient:
         """Opens a short-lived TCP connection, dispatches framed request, and returns response."""
         try:
             with socket.create_connection((self.host, self.port), timeout=self.timeout_sec) as sock:
+                if secure_mode():
+                    with client_context().wrap_socket(sock, server_hostname="gateway") as tls_sock:
+                        send_proto(tls_sock, request)
+                        return recv_proto(tls_sock, datamesh_pb2.ClientResponse)
                 send_proto(sock, request)
                 return recv_proto(sock, datamesh_pb2.ClientResponse)
         except (TimeoutError, ConnectionError, OSError) as err:
@@ -77,6 +82,14 @@ class TCPGatewayClient:
                 success=False,
                 message=f"Gateway connection error: {err}",
             )
+
+    def security_events(self) -> tuple[str, list[datamesh_pb2.SecurityEvent]]:
+        response = self._execute_request(
+            datamesh_pb2.ClientRequest(action=datamesh_pb2.GET_SECURITY_EVENTS)
+        )
+        if not response.success:
+            raise ConnectionError(response.message or "Gateway unavailable")
+        return response.security_mode, list(response.security_events)
 
     def list_devices(self) -> list[datamesh_pb2.DeviceInfo]:
         """Retrieves the list of discovered data sources and their status from the Gateway.

@@ -1,0 +1,12 @@
+.git
+.venv
+.datamesh-security
+.datamesh-security-state
+__pycache__
+.pytest_cache
+.ruff_cache
+*.db
+*.sqlite3
+.agents
+.aws
+.codex

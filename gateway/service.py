@@ -3,10 +3,14 @@
 import logging
 import socket
 import threading
+import time
+from collections import deque
 
 import datamesh_pb2
 
 from common.framing import recv_proto, send_proto
+from common.security import DatagramSecurity, SecurityError, datagram_security
+from common.tls import peer_common_name, secure_mode, server_context
 from gateway.proxy import ACControlProxy, GrpcACControlProxy
 from gateway.registry import DeviceRegistry
 from gateway.storage import GatewayStorageProtocol, TelemetryStorage
@@ -34,6 +38,10 @@ class GatewayCoordinator:
         self._tcp_server_sock: socket.socket | None = None
         self._tcp_thread: threading.Thread | None = None
         self._running = False
+        self._security_events: deque[datamesh_pb2.SecurityEvent] = deque(maxlen=500)
+        self._security_lock = threading.Lock()
+        self._tls_context = server_context() if secure_mode() else None
+        self._udp_security = datagram_security("gateway")
 
     def handle_client_request(
         self,
@@ -45,6 +53,15 @@ class GatewayCoordinator:
         Example:
             resp = coordinator.handle_client_request(request)
         """
+        if request.action == datamesh_pb2.GET_SECURITY_EVENTS:
+            with self._security_lock:
+                events = list(self._security_events)
+            return datamesh_pb2.ClientResponse(
+                success=True,
+                security_events=events,
+                security_mode="secure" if self._udp_security else "insecure",
+            )
+
         if request.action == datamesh_pb2.LIST_DEVICES:
             devices = self.registry.list_devices(current_time_ms)
             return datamesh_pb2.ClientResponse(success=True, devices=devices)
@@ -102,12 +119,31 @@ class GatewayCoordinator:
         Example:
             coordinator.handle_udp_datagram(data, addr)
         """
+        kind = None
+        sender = None
+        if self._udp_security:
+            try:
+                kind, sender, raw_bytes = self._udp_security.decode(raw_bytes)
+                if kind not in (DatagramSecurity.TELEMETRY, DatagramSecurity.ANNOUNCEMENT):
+                    raise SecurityError("unexpected message kind")
+            except SecurityError as err:
+                logger.warning("SECURITY ALERT: UDP rejected from %s: %s", sender_addr, err)
+                event = datamesh_pb2.SecurityEvent(
+                    timestamp_ms=time.time_ns() // 1_000_000,
+                    message=str(err),
+                    sender=f"{sender_addr[0]}:{sender_addr[1]}",
+                )
+                with self._security_lock:
+                    self._security_events.append(event)
+                return
         # Try decoding as TelemetryPacket first (high frequency continuous stream)
         telemetry = datamesh_pb2.TelemetryPacket()
         try:
             telemetry.ParseFromString(raw_bytes)
             if (
-                telemetry.device_id
+                (kind is None or kind == DatagramSecurity.TELEMETRY)
+                and telemetry.device_id
+                and (sender is None or telemetry.device_id == sender)
                 and telemetry.timestamp_ms > 0
                 and telemetry.device_type != datamesh_pb2.DEVICE_TYPE_UNKNOWN
             ):
@@ -121,7 +157,11 @@ class GatewayCoordinator:
         device = datamesh_pb2.DeviceInfo()
         try:
             device.ParseFromString(raw_bytes)
-            if device.device_id:
+            if (
+                (kind is None or kind == DatagramSecurity.ANNOUNCEMENT)
+                and device.device_id
+                and (sender is None or device.device_id == sender)
+            ):
                 if not device.ip:
                     device.ip = sender_addr[0]
                 self.registry.register_device(device)
@@ -142,6 +182,8 @@ class GatewayCoordinator:
         """
         beacon = datamesh_pb2.DiscoveryRequest(gateway_ip=gateway_ip, telemetry_udp_port=udp_port)
         data = beacon.SerializeToString()
+        if self._udp_security:
+            data = self._udp_security.encode(DatagramSecurity.DISCOVERY, data)
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as sock:
             sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
             sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 1)
@@ -194,6 +236,19 @@ class GatewayCoordinator:
             client_t.start()
 
     def _handle_client_connection(self, conn: socket.socket) -> None:
+        if self._tls_context is not None:
+            try:
+                conn.settimeout(3.0)
+                conn = self._tls_context.wrap_socket(conn, server_side=True)
+                if peer_common_name(conn.getpeercert() or {}) != "client":
+                    logger.warning("SECURITY ALERT: unauthorized TCP client certificate")
+                    conn.close()
+                    return
+                conn.settimeout(None)
+            except (OSError, ValueError) as err:
+                logger.warning("SECURITY ALERT: TLS client rejected: %s", err)
+                conn.close()
+                return
         with conn:
             while self._running:
                 try:

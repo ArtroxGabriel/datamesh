@@ -21,6 +21,7 @@ class ClientAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     CONTROL_AC: _ClassVar[ClientAction]
     QUERY_ANALYTICS: _ClassVar[ClientAction]
     GET_HISTORY: _ClassVar[ClientAction]
+    GET_SECURITY_EVENTS: _ClassVar[ClientAction]
 
 class AnalyticsQueryType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -37,6 +38,7 @@ LIST_DEVICES: ClientAction
 CONTROL_AC: ClientAction
 QUERY_ANALYTICS: ClientAction
 GET_HISTORY: ClientAction
+GET_SECURITY_EVENTS: ClientAction
 ANALYTICS_QUERY_UNKNOWN: AnalyticsQueryType
 HOTTEST_RACK: AnalyticsQueryType
 AVG_PDU_POWER: AnalyticsQueryType
@@ -160,6 +162,16 @@ class AnalyticsResult(_message.Message):
     sample_count: int
     def __init__(self, query_type: _Optional[_Union[AnalyticsQueryType, str]] = ..., target_device_id: _Optional[str] = ..., primary_value: _Optional[float] = ..., secondary_value: _Optional[float] = ..., unit: _Optional[str] = ..., summary: _Optional[str] = ..., sample_count: _Optional[int] = ...) -> None: ...
 
+class SecurityEvent(_message.Message):
+    __slots__ = ("timestamp_ms", "message", "sender")
+    TIMESTAMP_MS_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    SENDER_FIELD_NUMBER: _ClassVar[int]
+    timestamp_ms: int
+    message: str
+    sender: str
+    def __init__(self, timestamp_ms: _Optional[int] = ..., message: _Optional[str] = ..., sender: _Optional[str] = ...) -> None: ...
+
 class ClientRequest(_message.Message):
     __slots__ = ("action", "ac_control", "query_type", "window_seconds", "history_limit")
     ACTION_FIELD_NUMBER: _ClassVar[int]
@@ -175,15 +187,19 @@ class ClientRequest(_message.Message):
     def __init__(self, action: _Optional[_Union[ClientAction, str]] = ..., ac_control: _Optional[_Union[ACControlRequest, _Mapping]] = ..., query_type: _Optional[_Union[AnalyticsQueryType, str]] = ..., window_seconds: _Optional[int] = ..., history_limit: _Optional[int] = ...) -> None: ...
 
 class ClientResponse(_message.Message):
-    __slots__ = ("success", "message", "devices", "analytics", "history")
+    __slots__ = ("success", "message", "devices", "analytics", "history", "security_events", "security_mode")
     SUCCESS_FIELD_NUMBER: _ClassVar[int]
     MESSAGE_FIELD_NUMBER: _ClassVar[int]
     DEVICES_FIELD_NUMBER: _ClassVar[int]
     ANALYTICS_FIELD_NUMBER: _ClassVar[int]
     HISTORY_FIELD_NUMBER: _ClassVar[int]
+    SECURITY_EVENTS_FIELD_NUMBER: _ClassVar[int]
+    SECURITY_MODE_FIELD_NUMBER: _ClassVar[int]
     success: bool
     message: str
     devices: _containers.RepeatedCompositeFieldContainer[DeviceInfo]
     analytics: AnalyticsResult
     history: _containers.RepeatedCompositeFieldContainer[TelemetryPacket]
-    def __init__(self, success: _Optional[bool] = ..., message: _Optional[str] = ..., devices: _Optional[_Iterable[_Union[DeviceInfo, _Mapping]]] = ..., analytics: _Optional[_Union[AnalyticsResult, _Mapping]] = ..., history: _Optional[_Iterable[_Union[TelemetryPacket, _Mapping]]] = ...) -> None: ...
+    security_events: _containers.RepeatedCompositeFieldContainer[SecurityEvent]
+    security_mode: str
+    def __init__(self, success: _Optional[bool] = ..., message: _Optional[str] = ..., devices: _Optional[_Iterable[_Union[DeviceInfo, _Mapping]]] = ..., analytics: _Optional[_Union[AnalyticsResult, _Mapping]] = ..., history: _Optional[_Iterable[_Union[TelemetryPacket, _Mapping]]] = ..., security_events: _Optional[_Iterable[_Union[SecurityEvent, _Mapping]]] = ..., security_mode: _Optional[str] = ...) -> None: ...
