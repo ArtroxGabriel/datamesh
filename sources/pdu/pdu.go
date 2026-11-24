@@ -10,6 +10,7 @@ import (
 	"time"
 
 	datameshpb "datamesh/gen/go"
+
 	"google.golang.org/protobuf/proto"
 )
 
@@ -76,6 +77,7 @@ type PDU struct {
 	cfg           Config
 	gatewayAddr   *net.UDPAddr
 	sender        UDPPacketSender
+	security      *secureDatagrams
 	overloadUntil time.Time
 	overloadWatts float64
 }
@@ -84,7 +86,11 @@ type PDU struct {
 // Without GatewayHost the gateway address stays unknown until a discovery beacon arrives.
 func NewPDU(cfg Config, sender UDPPacketSender) (*PDU, error) {
 	resolvedCfg := applyDefaults(cfg)
-	unit := &PDU{cfg: resolvedCfg, sender: sender}
+	security, err := newSecureDatagrams(resolvedCfg.DeviceID)
+	if err != nil {
+		return nil, err
+	}
+	unit := &PDU{cfg: resolvedCfg, sender: sender, security: security}
 	if resolvedCfg.GatewayHost == "" {
 		return unit, nil
 	}
@@ -201,6 +207,12 @@ func (p *PDU) SendTelemetry() error {
 		return fmt.Errorf("failed to marshal telemetry packet: %w", err)
 	}
 
+	if p.security != nil {
+		payload, err = p.security.encode(3, payload)
+		if err != nil {
+			return err
+		}
+	}
 	if _, err := p.sender.SendTo(payload, target); err != nil {
 		return fmt.Errorf("failed to transmit UDP packet to %v: %w", target, err)
 	}
@@ -225,6 +237,13 @@ func (p *PDU) CreateDeviceInfo() *datameshpb.DeviceInfo {
 
 // HandleDiscoveryRequest updates the targeted Gateway endpoint and replies with DeviceInfo.
 func (p *PDU) HandleDiscoveryRequest(data []byte) (*datameshpb.DeviceInfo, error) {
+	if p.security != nil {
+		var err error
+		data, err = p.security.discovery(data)
+		if err != nil {
+			return nil, err
+		}
+	}
 	beacon := &datameshpb.DiscoveryRequest{}
 	if err := proto.Unmarshal(data, beacon); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal discovery request: %w", err)
@@ -248,6 +267,12 @@ func (p *PDU) HandleDiscoveryRequest(data []byte) (*datameshpb.DeviceInfo, error
 		return nil, fmt.Errorf("failed to marshal device info: %w", err)
 	}
 
+	if p.security != nil {
+		payload, err = p.security.encode(2, payload)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if _, err := p.sender.SendTo(payload, newAddr); err != nil {
 		return nil, fmt.Errorf("failed to send announcement to gateway: %w", err)
 	}

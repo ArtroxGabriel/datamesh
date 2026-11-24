@@ -154,6 +154,25 @@ def create_app(
     def get_events(limit: int = Query(default=200, ge=1, le=500)) -> list[dict[str, Any]]:
         return [_event_to_dict(e) for e in events.recent(limit)]
 
+    @app.get("/api/security-events")
+    def get_security_events() -> dict[str, Any]:
+        try:
+            security_client: Any = client
+            mode, security_events = security_client.security_events()
+        except (AttributeError, ConnectionError) as err:
+            raise HTTPException(status_code=503, detail=str(err)) from err
+        return {
+            "mode": mode,
+            "events": [
+                {
+                    "timestamp_ms": event.timestamp_ms,
+                    "message": event.message,
+                    "sender": event.sender,
+                }
+                for event in security_events
+            ],
+        }
+
     @app.get("/api/devices")
     def get_devices() -> list[dict[str, Any]]:
         devices = client.list_devices()

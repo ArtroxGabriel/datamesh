@@ -1,11 +1,16 @@
 """Executable entrypoint for Rack Temperature Sensor source."""
 
+import hmac
 import logging
 import os
 import signal
 import sys
 import threading
 import time
+from pathlib import Path
+
+import uvicorn
+from fastapi import FastAPI, Header, HTTPException
 
 if hasattr(signal, "SIGUSR1"):
     signal.signal(signal.SIGUSR1, signal.SIG_IGN)
@@ -75,6 +80,37 @@ def _setup_signals(sensor: TemperatureSensor, stop_event: threading.Event, senso
         signal.signal(signal.SIGUSR1, _on_usr1)
 
 
+def create_lab_control_app(sensor: TemperatureSensor, token: str) -> FastAPI:
+    """Expose only the simulated anomaly trigger to holders of the lab token."""
+    if not token:
+        raise ValueError("Lab token is empty")
+    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+
+    @app.post("/anomaly")
+    def anomaly(x_lab_token: str = Header(default="")) -> dict[str, str]:
+        if not hmac.compare_digest(x_lab_token, token):
+            raise HTTPException(status_code=403, detail="forbidden")
+        sensor.trigger_anomaly(temp_c=38.8)
+        return {"device_id": sensor.device_id, "status": "triggered"}
+
+    return app
+
+
+def start_lab_control(sensor: TemperatureSensor) -> None:
+    """Start the optional token-protected anomaly endpoint for the isolated lab."""
+    token_path = os.getenv("DATAMESH_LAB_TOKEN_FILE")
+    if not token_path:
+        return
+    app = create_lab_control_app(sensor, Path(token_path).read_text().strip())
+    server = threading.Thread(
+        target=uvicorn.run,
+        kwargs={"app": app, "host": "0.0.0.0", "port": 8092, "log_level": "warning"},
+        daemon=True,
+        name="lab-anomaly-control",
+    )
+    server.start()
+
+
 def main() -> None:
     s_id, gw_host, gw_port, interval, mc_grp, mc_port, base_temp = _load_config()
     hold_sec, decay_sec = _load_anomaly_timing()
@@ -92,6 +128,7 @@ def main() -> None:
     stop_event = threading.Event()
     _setup_signals(sensor, stop_event, s_id)
 
+    start_lab_control(sensor)
     sensor.start_multicast_listener()
     sensor.start()
     target_desc = f"{gw_host}:{gw_port}" if gw_host and gw_port else "awaiting multicast beacon"

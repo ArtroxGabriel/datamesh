@@ -1,0 +1,137 @@
+x-common: &common
+  build:
+    context: .
+    dockerfile: Dockerfile.lab
+    target: lab
+  cap_add: [NET_ADMIN]
+  environment: &env
+    DATAMESH_SECURITY_MODE: ${DATAMESH_SECURITY_MODE:-insecure}
+    DATAMESH_CREDENTIALS_DIR: /security
+    DATAMESH_SECURITY_STATE_DIR: /state
+    SEND_INTERVAL_SEC: '2'
+  networks:
+    lab: {}
+
+services:
+  gateway:
+    <<: *common
+    command: python -m gateway.main
+    environment:
+      <<: *env
+      GATEWAY_ADVERTISED_IP: 172.30.53.10
+      DB_PATH: /data/datamesh.db
+    networks:
+      lab:
+        ipv4_address: 172.30.53.10
+    volumes:
+      - ./.datamesh-security/ca.crt:/security/ca.crt:ro
+      - ./.datamesh-security/gateway.crt:/security/gateway.crt:ro
+      - ./.datamesh-security/gateway.key:/security/gateway.key:ro
+      - ./.datamesh-security/hmac:/security/hmac:ro
+      - gateway-state:/state
+      - gateway-data:/data
+  ac:
+    <<: *common
+    command: python -m sources.ac.main
+    environment:
+      <<: *env
+      AC_DEVICE_ID: ac-01-carnot
+    networks:
+      lab:
+        ipv4_address: 172.30.53.11
+    volumes:
+      - ./.datamesh-security/ca.crt:/security/ca.crt:ro
+      - ./.datamesh-security/ac.crt:/security/ac.crt:ro
+      - ./.datamesh-security/ac.key:/security/ac.key:ro
+      - ./.datamesh-security/hmac/gateway.key:/security/hmac/gateway.key:ro
+      - ./.datamesh-security/hmac/ac-01-carnot.key:/security/hmac/ac-01-carnot.key:ro
+      - ac-state:/state
+  temperature:
+    <<: *common
+    command: python -m sources.temperature.main
+    environment:
+      <<: *env
+      SENSOR_ID: temp-01-turing
+      DATAMESH_LAB_TOKEN_FILE: /security/lab-control.token
+    networks:
+      lab:
+        ipv4_address: 172.30.53.12
+    volumes:
+      - ./.datamesh-security/lab-control.token:/security/lab-control.token:ro
+      - ./.datamesh-security/hmac/gateway.key:/security/hmac/gateway.key:ro
+      - ./.datamesh-security/hmac/temp-01-turing.key:/security/hmac/temp-01-turing.key:ro
+      - temperature-state:/state
+  pdu:
+    <<: *common
+    command: pdu
+    environment:
+      <<: *env
+      PDU_DEVICE_ID: pdu-01-tesla
+    volumes:
+      - ./.datamesh-security/hmac/gateway.key:/security/hmac/gateway.key:ro
+      - ./.datamesh-security/hmac/pdu-01-tesla.key:/security/hmac/pdu-01-tesla.key:ro
+      - pdu-state:/state
+  client:
+    <<: *common
+    command: python -m client.main
+    environment:
+      <<: *env
+      GATEWAY_HOST: 172.30.53.10
+      GATEWAY_PORT: '9997'
+    networks:
+      lab:
+        ipv4_address: 172.30.53.13
+    volumes:
+      - ./.datamesh-security/ca.crt:/security/ca.crt:ro
+      - ./.datamesh-security/client.crt:/security/client.crt:ro
+      - ./.datamesh-security/client.key:/security/client.key:ro
+  attacker:
+    build:
+      context: .
+      dockerfile: Dockerfile.lab
+      target: lab
+    profiles: [attack]
+    network_mode: service:gateway
+    cap_add: [NET_RAW]
+    command: uvicorn lab.attacker:app --host 0.0.0.0 --port 8091
+    volumes:
+      - ./.datamesh-security/ca.crt:/public/ca.crt:ro
+      - ./.datamesh-security/lab-control.token:/public/lab-control.token:ro
+      - lab-runs:/runs
+  controller:
+    build:
+      context: .
+      dockerfile: Dockerfile.lab
+      target: controller
+    command: uvicorn lab.controller:app --host 0.0.0.0 --port 8081
+    environment:
+      LAB_REPO_ROOT: ${PWD}
+    working_dir: ${PWD}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${PWD}:${PWD}:ro
+    networks:
+      lab:
+        ipv4_address: 172.30.53.15
+
+  host-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile.lab
+      target: lab
+    network_mode: host
+    command: python -m lab.host_proxy
+
+networks:
+  lab:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.53.0/24
+volumes:
+  gateway-state:
+  gateway-data:
+  ac-state:
+  temperature-state:
+  pdu-state:
+  lab-runs:

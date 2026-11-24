@@ -12,6 +12,8 @@ from typing import Protocol
 
 import datamesh_pb2
 
+from common.security import DatagramSecurity, SecurityError, datagram_security
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_BASE_TEMP_C = 23.5
@@ -61,6 +63,7 @@ class TemperatureSensor:
         clock: Callable[[], float] | None = None,
     ) -> None:
         self.device_id = device_id
+        self._udp_security = datagram_security(device_id)
         self.gateway_host = gateway_host
         self.gateway_port = gateway_port
         self.send_interval_sec = send_interval_sec
@@ -165,6 +168,8 @@ class TemperatureSensor:
                 self._sock = self._socket_factory()
 
             payload = packet.SerializeToString()
+            if self._udp_security:
+                payload = self._udp_security.encode(DatagramSecurity.TELEMETRY, payload)
             self._sock.sendto(payload, (self.gateway_host, self.gateway_port))
 
     def handle_discovery_request(self, raw_bytes: bytes) -> None:
@@ -175,6 +180,10 @@ class TemperatureSensor:
         """
         req = datamesh_pb2.DiscoveryRequest()
         try:
+            if self._udp_security:
+                kind, _, raw_bytes = self._udp_security.decode(raw_bytes, expected_sender="gateway")
+                if kind != DatagramSecurity.DISCOVERY:
+                    raise SecurityError("unexpected message kind")
             req.ParseFromString(raw_bytes)
         except Exception as err:
             logger.warning("Failed to parse discovery request: %s", err)
@@ -193,8 +202,11 @@ class TemperatureSensor:
                 last_seen_ms=_now_ms(),
                 state_summary=f"Online | Base temp ~{self.base_temp_c:.1f} °C",
             )
+            payload = announcement.SerializeToString()
+            if self._udp_security:
+                payload = self._udp_security.encode(DatagramSecurity.ANNOUNCEMENT, payload)
             self._sock.sendto(
-                announcement.SerializeToString(),
+                payload,
                 (self.gateway_host, self.gateway_port),
             )
         logger.info(

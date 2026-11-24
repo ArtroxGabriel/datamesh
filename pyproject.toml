@@ -5,6 +5,7 @@ description = "DataMesh DCIM - Distributed Data Center Infrastructure Management
 readme = "docs/GOAL.md"
 requires-python = ">=3.12"
 dependencies = [
+    "cryptography",
     "fastapi>=0.115.0",
     "grpcio>=1.68.0",
     "grpcio-tools>=1.68.0",

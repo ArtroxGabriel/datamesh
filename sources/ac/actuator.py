@@ -14,6 +14,9 @@ import datamesh_pb2
 import datamesh_pb2_grpc
 import grpc
 
+from common.security import DatagramSecurity, SecurityError, datagram_security
+from common.tls import grpc_server_credentials, secure_mode
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_TARGET_TEMP_C = 21.0
@@ -59,6 +62,12 @@ class AirConditionerServicer(datamesh_pb2_grpc.AirConditionerServiceServicer):
         Example:
             resp = servicer.SetControl(request, context)
         """
+        if secure_mode():
+            identities = context.auth_context().get("x509_common_name", []) if context else []
+            if b"gateway" not in identities:
+                if context:
+                    context.abort(grpc.StatusCode.PERMISSION_DENIED, "gateway identity required")
+                return datamesh_pb2.ACControlResponse(success=False, message="unauthorized")
         logger.info(
             "Received SetControl for %s: power=%s target=%.1f°C fan=%d%%",
             request.device_id,
@@ -96,6 +105,7 @@ class AirConditionerDevice:
         socket_factory: Callable[[], UDPSocketProtocol] | None = None,
     ) -> None:
         self.device_id = device_id
+        self._udp_security = datagram_security(device_id)
         self.grpc_port = grpc_port
         self.advertised_ip = advertised_ip
         self.gateway_host = gateway_host
@@ -215,7 +225,10 @@ class AirConditionerDevice:
                 return None
             if not self._sock:
                 self._sock = self._socket_factory()
-            self._sock.sendto(packet.SerializeToString(), (host, port))
+            payload = packet.SerializeToString()
+            if self._udp_security:
+                payload = self._udp_security.encode(DatagramSecurity.TELEMETRY, payload)
+            self._sock.sendto(payload, (host, port))
         return packet
 
     def send_initial_registration(self) -> None:
@@ -231,7 +244,10 @@ class AirConditionerDevice:
             if not self._sock:
                 self._sock = self._socket_factory()
             info = self._build_device_info_locked()
-            self._sock.sendto(info.SerializeToString(), (host, port))
+            payload = info.SerializeToString()
+            if self._udp_security:
+                payload = self._udp_security.encode(DatagramSecurity.ANNOUNCEMENT, payload)
+            self._sock.sendto(payload, (host, port))
 
     def handle_discovery_request(self, raw_bytes: bytes) -> None:
         """Learns Gateway endpoint from discovery beacon and sends DeviceInfo response.
@@ -241,6 +257,10 @@ class AirConditionerDevice:
         """
         req = datamesh_pb2.DiscoveryRequest()
         try:
+            if self._udp_security:
+                kind, _, raw_bytes = self._udp_security.decode(raw_bytes, expected_sender="gateway")
+                if kind != DatagramSecurity.DISCOVERY:
+                    raise SecurityError("unexpected message kind")
             req.ParseFromString(raw_bytes)
         except Exception as err:
             logger.warning("Failed to parse discovery request: %s", err)
@@ -252,8 +272,11 @@ class AirConditionerDevice:
             if not self._sock:
                 self._sock = self._socket_factory()
             announcement = self._build_device_info_locked()
+            payload = announcement.SerializeToString()
+            if self._udp_security:
+                payload = self._udp_security.encode(DatagramSecurity.ANNOUNCEMENT, payload)
             self._sock.sendto(
-                announcement.SerializeToString(),
+                payload,
                 (self.gateway_host, self.gateway_port),
             )
         logger.info("Learned gateway at %s:%d via beacon", req.gateway_ip, req.telemetry_udp_port)
@@ -320,7 +343,10 @@ class AirConditionerDevice:
             AirConditionerServicer(self), server
         )
         bind_address = f"0.0.0.0:{self.grpc_port}"
-        bound_port = server.add_insecure_port(bind_address)
+        if secure_mode():
+            bound_port = server.add_secure_port(bind_address, grpc_server_credentials())
+        else:
+            bound_port = server.add_insecure_port(bind_address)
         if bound_port > 0:
             self.grpc_port = bound_port
         server.start()

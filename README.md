@@ -210,3 +210,11 @@ mise exec -- go test -v ./sources/pdu/...
 # Limpeza completa (encerra processos órfãos, limpa caches/bancos e regera builds)
 mise exec -- task clean
 ```
+
+### Laboratório de segurança
+
+Consulte [decisões e operação do laboratório](docs/security-decisions.md) para preparar as
+credenciais, recriar a pilha em modo seguro ou inseguro e executar as demonstrações isoladas.
+
+O console interativo do laboratório está disponível em `http://127.0.0.1:8081` após iniciar
+`compose.lab.yml` com o perfil `attack`; ele oferece troca de modo e replay automático ou manual.

@@ -2,6 +2,8 @@
 
 Documento síntese da proposta, arquitetura, vulnerabilidades e mitigações para a apresentação prática da disciplina de Redes de Computadores 2.
 
+> **Atualização de implementação:** a troca entre cenários ocorre pela variável `DATAMESH_SECURITY_MODE` e reinicialização da pilha, sem troca de branch. O modo seguro usa AES-256-GCM e HMAC-SHA256 no UDP. Para decisões, comandos e limitações atuais, consulte [security-decisions.md](security-decisions.md). Os trechos abaixo preservam o roteiro original da proposta.
+
 ---
 
 ## 1. Contexto e Objetivo Acadêmico

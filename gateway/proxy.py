@@ -6,6 +6,8 @@ import datamesh_pb2
 import datamesh_pb2_grpc
 import grpc
 
+from common.tls import grpc_gateway_credentials, secure_mode
+
 
 class ACControlProxy(Protocol):
     """Protocol for sending control commands to precision air conditioners."""
@@ -33,7 +35,15 @@ class GrpcACControlProxy:
         """
         target = f"{device.ip}:{device.grpc_port}"
         try:
-            with grpc.insecure_channel(target) as channel:
+            if secure_mode():
+                channel = grpc.secure_channel(
+                    target,
+                    grpc_gateway_credentials(),
+                    options=(("grpc.ssl_target_name_override", "ac"),),
+                )
+            else:
+                channel = grpc.insecure_channel(target)
+            with channel:
                 stub = datamesh_pb2_grpc.AirConditionerServiceStub(channel)
                 return stub.SetControl(command, timeout=self._timeout)
         except grpc.RpcError as rpc_err:
