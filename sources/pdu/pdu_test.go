@@ -265,3 +265,49 @@ func TestSendTelemetrySkipsUntilGatewayIsDiscovered(t *testing.T) {
 		t.Errorf("expected no datagrams before discovery, got %d", len(sender.Packets))
 	}
 }
+
+func TestTriggerOverloadEmitsHighPowerAlertAndRecovers(t *testing.T) {
+	// Arrange
+	sender := &FakeUDPSender{}
+	cfg := pdu.Config{
+		DeviceID:       "pdu-rack-01",
+		GatewayHost:    "127.0.0.1",
+		GatewayPort:    9998,
+		BasePowerWatts: 1400.0,
+		VoltageVolts:   220.0,
+	}
+	unit, err := pdu.NewPDU(cfg, sender)
+	if err != nil {
+		t.Fatalf("unexpected NewPDU error: %v", err)
+	}
+
+	// Act
+	if err := unit.TriggerOverload(8000.0, 40*time.Millisecond); err != nil {
+		t.Fatalf("unexpected TriggerOverload error: %v", err)
+	}
+
+	// Assert overload alert packet sent immediately
+	if sender.SentCount() != 1 {
+		t.Fatalf("expected 1 overload packet sent, got %d", sender.SentCount())
+	}
+	decoded := &datameshpb.TelemetryPacket{}
+	if err := proto.Unmarshal(sender.Packets[0].Data, decoded); err != nil {
+		t.Fatalf("failed to unmarshal overload packet: %v", err)
+	}
+	if !decoded.GetIsAlert() {
+		t.Errorf("expected IsAlert=true during overload")
+	}
+	if decoded.GetPdu().GetPowerWatts() < 7900.0 {
+		t.Errorf("expected overload power near 8000W, got %.1fW", decoded.GetPdu().GetPowerWatts())
+	}
+
+	// Wait for overload window to expire and verify normal power returns
+	time.Sleep(55 * time.Millisecond)
+	recovered := unit.CreateTelemetryPacket()
+	if recovered.GetIsAlert() {
+		t.Errorf("expected IsAlert=false after overload duration expires")
+	}
+	if recovered.GetPdu().GetPowerWatts() > 1500.0 {
+		t.Errorf("expected normal power near 1400W, got %.1fW", recovered.GetPdu().GetPowerWatts())
+	}
+}
