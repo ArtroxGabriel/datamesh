@@ -39,12 +39,13 @@ class Server(socketserver.ThreadingTCPServer):
 def main() -> None:
     console = Server(8081, ("172.30.53.15", 8081))
     threading.Thread(target=console.serve_forever, daemon=True).start()
-    try:
-        dashboard = Server(8080, ("172.30.53.13", 8080))
-    except OSError as err:
-        print(f"Dashboard proxy unavailable: {err}", flush=True)
-    else:
-        threading.Thread(target=dashboard.serve_forever, daemon=True).start()
+    for port, dest in ((8080, ("172.30.53.13", 8080)), (8082, ("172.30.53.15", 8081))):
+        try:
+            proxy = Server(port, dest)
+        except OSError as err:
+            print(f"Proxy :{port} unavailable: {err}", flush=True)
+        else:
+            threading.Thread(target=proxy.serve_forever, daemon=True).start()
     threading.Event().wait()
 
 

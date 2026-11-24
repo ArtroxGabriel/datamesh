@@ -60,3 +60,68 @@ def test_controller_only_accepts_fixed_scenarios_and_local_host(monkeypatch):
         ).status_code
         == 403
     )
+
+
+def test_menu_endpoint_and_actions_on_port_8082(monkeypatch):
+    docker_calls = []
+    monkeypatch.setattr(
+        controller, "docker_run", lambda *args, **_kw: docker_calls.append(args) or ""
+    )
+    monkeypatch.setattr(controller, "snapshot", lambda: {"security": {"mode": "secure"}})
+    client = TestClient(controller.app, base_url="http://127.0.0.1:8082")
+    assert "Menu Operacional" in client.get("/").text
+    assert client.post("/api/action", json={"action": "unknown"}).status_code == 400
+    assert (
+        client.post("/api/action", json={"action": "stop_source", "target": "gateway"}).status_code
+        == 400
+    )
+    assert (
+        client.post(
+            "/api/action", json={"action": "add_source", "source_type": "temp", "target": "../bad"}
+        ).status_code
+        == 400
+    )
+    headers = {"Origin": "http://127.0.0.1:8082"}
+    assert (
+        client.post("/api/action", headers=headers, json={"action": "pdu_overload"}).status_code
+        == 200
+    )
+    assert (
+        client.post("/api/action", headers=headers, json={"action": "stack_up"}).status_code == 200
+    )
+    assert (
+        client.post(
+            "/api/action",
+            headers=headers,
+            json={"action": "add_source", "source_type": "temp", "target": "temp-02-curie"},
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            "/api/action",
+            headers=headers,
+            json={"action": "remove_source", "target": "temp-02-curie"},
+        ).status_code
+        == 200
+    )
+    assert any("USR1" in c and "pdu" in c for c in docker_calls)
+    assert any("up" in c for c in docker_calls)
+    assert any("datamesh-extra-temp-02-curie" in c and "run" in c for c in docker_calls)
+    assert any("datamesh-extra-temp-02-curie" in c and "rm" in c for c in docker_calls)
+    auto_resp = client.post(
+        "/api/action",
+        headers=headers,
+        json={"action": "add_source", "source_type": "pdu", "param": "1850"},
+    )
+    assert auto_resp.status_code == 200
+    assert auto_resp.json()["target"].startswith("pdu-02-")
+    assert (
+        client.post(
+            "/api/action",
+            headers=headers,
+            json={"action": "anomaly", "target": "temp-01-turing"},
+        ).status_code
+        == 200
+    )
+    assert any("USR1" in c and "temperature" in c for c in docker_calls)

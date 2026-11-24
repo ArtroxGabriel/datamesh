@@ -37,6 +37,34 @@ tasks:
     cmds:
       - bash scripts/run_demo.sh
 
+  lab:
+    desc: Launch interactive Docker security lab menu (insecure/secure, anomalies, attacks)
+    cmds:
+      - bash scripts/run_lab.sh
+
+  lab-up:
+    desc: Provision lab credentials and start Docker lab (pass `-- --rebuild` to rebuild images)
+    cmds:
+      - bash scripts/security/setup_lab.sh
+      - |
+        BUILD_FLAG=""
+        if [[ " {{.CLI_ARGS}} " == *" --rebuild "* ]]; then
+          BUILD_FLAG="--build"
+        fi
+        docker compose -p datamesh-security-lab -f compose.lab.yml --profile attack up -d --force-recreate $BUILD_FLAG
+
+  lab-down:
+    desc: Stop Docker security lab containers
+    cmds:
+      - docker compose -p datamesh-security-lab -f compose.lab.yml --profile attack down --remove-orphans
+
+  lab-clean:
+    desc: Stop lab, remove extra containers, purge Docker volumes and generated lab credentials
+    cmds:
+      - docker ps -aq --filter name=^datamesh-extra- | xargs -r docker rm -f
+      - docker compose -p datamesh-security-lab -f compose.lab.yml --profile attack down -v --remove-orphans
+      - rm -rf .datamesh-security .datamesh-security-state
+
   smoke:
     desc: Run automated end-to-end smoke test across all local processes
     cmds:

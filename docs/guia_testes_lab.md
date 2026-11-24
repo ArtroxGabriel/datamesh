@@ -23,6 +23,27 @@ mise exec -- go vet ./sources/pdu/...
 
 ## 2. Laboratório Docker Compose (Cenário Inseguro vs. Seguro)
 
+Suba o laboratório com um único comando:
+
+```bash
+# Subir (ou use DATAMESH_SECURITY_MODE=secure mise exec -- task lab-up)
+mise exec -- task lab-up
+# Reconstruir imagens antes de subir:
+mise exec -- task lab-up -- --rebuild
+
+# Parar containers / Limpeza total (volumes, containers extras e credenciais)
+mise exec -- task lab-down
+mise exec -- task lab-clean
+```
+
+Interfaces disponíveis:
+- **Dashboard (`http://127.0.0.1:8080`):** visualização padrão de métricas, `/network` e `/events`.
+- **Security Lab (`http://127.0.0.1:8081`):** executar ataques (`sniff`, `replay`, `hijack`) com timeline.
+- **Gestão do Sistema (`http://127.0.0.1:8082`):** `up`/`down`, troca de modo, anomalias e adicionar/remover fontes.
+- **Menu interativo no terminal (opcional):** `mise exec -- task lab`.
+
+Se preferir os comandos manuais:
+
 ### Passo 1 — Provisionar credenciais locais (uma única vez)
 
 Gera a CA local, certificados X.509, chaves HMAC e o token do laboratório em `.datamesh-security/`:
